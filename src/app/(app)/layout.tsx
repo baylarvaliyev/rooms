@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 const NAV = [
   { id: 'feed',          label: 'Feed',         icon: '⊞',  path: '/feed' },
   { id: 'explore',       label: 'Explore',      icon: '🧭', path: '/explore' },
+  { id: 'search',        label: 'Search',       icon: '🔍', path: '/search' },
   { id: 'messages',      label: 'Messages',     icon: '💬', path: '/messages' },
   { id: 'notifications', label: 'Notifications',icon: '🔔', path: '/notifications' },
   { id: 'leaderboard',   label: 'Leaderboard',  icon: '🏆', path: '/leaderboard' },

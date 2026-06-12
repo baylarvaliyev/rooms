@@ -13,33 +13,38 @@ export default async function FeedPage() {
     .eq('id', user.id)
     .single()
 
-  // Get posts from all rooms, newest first
   const { data: posts } = await supabase
     .from('posts')
     .select('*, profiles(name, username), rooms(name, emoji, category)')
     .order('created_at', { ascending: false })
     .limit(30)
 
-  // Get which posts current user liked
   const { data: likes } = await supabase
     .from('likes')
     .select('post_id')
     .eq('user_id', user.id)
 
-  const likedIds = new Set((likes || []).map((l: any) => l.post_id))
+  const { data: savedPosts } = await supabase
+    .from('saved_posts')
+    .select('post_id')
+    .eq('user_id', user.id)
 
-  // Get rooms for create post dropdown
   const { data: rooms } = await supabase
-    .from('rooms')
-    .select('id, name, emoji')
-    .order('name')
+    .from('room_members')
+    .select('rooms(id, name, emoji)')
+    .eq('user_id', user.id)
+
+  const likedIds = (likes || []).map((l: any) => l.post_id)
+  const savedIds = (savedPosts || []).map((s: any) => s.post_id)
+  const userRooms = (rooms || []).map((r: any) => r.rooms).filter(Boolean)
 
   return (
     <FeedClient
       posts={posts || []}
-      likedIds={[...likedIds]}
+      likedIds={likedIds}
+      savedIds={savedIds}
       profile={profile}
-      rooms={rooms || []}
+      rooms={userRooms}
       currentUserId={user.id}
     />
   )

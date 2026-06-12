@@ -18,10 +18,10 @@ function timeAgo(date: string) {
   return `${Math.floor(s/86400)}d ago`
 }
 
-export default function FeedClient({ posts: initialPosts, likedIds, profile, rooms, currentUserId }: any) {
+export default function FeedClient({ posts: initialPosts, likedIds, savedIds, profile, rooms, currentUserId }: any) {
   const [posts, setPosts] = useState(initialPosts)
   const [liked, setLiked] = useState<Set<string>>(new Set(likedIds))
-  const [saved, setSaved] = useState<Set<string>>(new Set())
+  const [saved, setSaved] = useState<Set<string>>(new Set(savedIds))
   const [openComments, setOpenComments] = useState<Set<string>>(new Set())
   const [comments, setComments] = useState<Record<string, any[]>>({})
   const [commentInput, setCommentInput] = useState<Record<string, string>>({})
@@ -33,7 +33,7 @@ export default function FeedClient({ posts: initialPosts, likedIds, profile, roo
 
   async function toggleLike(postId: string) {
     const isLiked = liked.has(postId)
-    // Optimistic update
+    const post = posts.find((p: any) => p.id === postId)
     setLiked(prev => {
       const next = new Set(prev)
       isLiked ? next.delete(postId) : next.add(postId)
@@ -44,19 +44,25 @@ export default function FeedClient({ posts: initialPosts, likedIds, profile, roo
     ))
     if (isLiked) {
       await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', currentUserId)
-      await supabase.from('posts').update({ like_count: posts.find((p: any) => p.id === postId)?.like_count - 1 }).eq('id', postId)
+      await supabase.from('posts').update({ like_count: Math.max(0, (post?.like_count || 1) - 1) }).eq('id', postId)
     } else {
       await supabase.from('likes').insert({ post_id: postId, user_id: currentUserId })
-      await supabase.from('posts').update({ like_count: posts.find((p: any) => p.id === postId)?.like_count + 1 }).eq('id', postId)
+      await supabase.from('posts').update({ like_count: (post?.like_count || 0) + 1 }).eq('id', postId)
     }
   }
 
-  function toggleSave(postId: string) {
+  async function toggleSave(postId: string) {
+    const isSaved = saved.has(postId)
     setSaved(prev => {
       const next = new Set(prev)
-      next.has(postId) ? next.delete(postId) : next.add(postId)
+      isSaved ? next.delete(postId) : next.add(postId)
       return next
     })
+    if (isSaved) {
+      await supabase.from('saved_posts').delete().eq('post_id', postId).eq('user_id', currentUserId)
+    } else {
+      await supabase.from('saved_posts').insert({ post_id: postId, user_id: currentUserId })
+    }
   }
 
   async function toggleComments(postId: string) {
@@ -133,11 +139,19 @@ export default function FeedClient({ posts: initialPosts, likedIds, profile, roo
                 color: 'var(--text3)', cursor: 'pointer'
               }}
             >What&apos;s on your mind, {name.split(' ')[0]}?</div>
+            <button
+              onClick={() => setCreating(true)}
+              style={{
+                padding: '8px 14px', background: 'var(--accent)', border: 'none',
+                borderRadius: '9px', color: '#fff', fontSize: '12px',
+                fontWeight: '600', cursor: 'pointer', flexShrink: 0
+              }}
+            >Post</button>
           </div>
         </div>
 
-        {/* Posts */}
-        {posts.length === 0 ? (
+        {/* Empty state */}
+        {posts.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>✨</div>
             <div style={{ fontWeight: '600', fontSize: '16px', marginBottom: '6px', color: 'var(--text2)' }}>
@@ -155,148 +169,165 @@ export default function FeedClient({ posts: initialPosts, likedIds, profile, roo
               }}
             >Explore Rooms</button>
           </div>
-        ) : (
-          posts.map((post: any, idx: number) => {
-            const posterName = post.profiles?.name || 'Unknown'
-            const posterColor = getColor(posterName)
-            const isLiked = liked.has(post.id)
-            const isSaved = saved.has(post.id)
-            const showComments = openComments.has(post.id)
+        )}
 
-            return (
-              <div key={post.id} className="fade-up" style={{
-                background: 'var(--bg2)', border: '1px solid var(--border)',
-                borderRadius: '13px', marginBottom: '14px', overflow: 'hidden',
-                animationDelay: `${idx * 0.04}s`
-              }}>
-                {/* Header */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '13px 14px 0' }}>
-                  <div style={{
+        {/* Posts */}
+        {posts.map((post: any, idx: number) => {
+          const posterName = post.profiles?.name || 'Unknown'
+          const posterColor = getColor(posterName)
+          const isLiked = liked.has(post.id)
+          const isSaved = saved.has(post.id)
+          const showComments = openComments.has(post.id)
+
+          return (
+            <div key={post.id} className="fade-up" style={{
+              background: 'var(--bg2)', border: '1px solid var(--border)',
+              borderRadius: '13px', marginBottom: '14px', overflow: 'hidden',
+              animationDelay: `${idx * 0.04}s`
+            }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '13px 14px 0' }}>
+                <div
+                  onClick={() => router.push(`/users/${post.profiles?.username}`)}
+                  style={{
                     width: '36px', height: '36px', borderRadius: '50%', background: posterColor,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '13px', fontWeight: '700', color: '#fff', flexShrink: 0
-                  }}>{posterName.charAt(0).toUpperCase()}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text1)' }}>{posterName}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      {post.rooms && (
-                        <span
-                          onClick={() => router.push(`/rooms/${post.room_id}`)}
-                          style={{ fontSize: '11px', color: 'var(--accent2)', cursor: 'pointer' }}
-                        >{post.rooms.emoji} {post.rooms.name}</span>
-                      )}
-                      <span style={{ fontSize: '11px', color: 'var(--text3)' }}>· {timeAgo(post.created_at)}</span>
-                    </div>
+                    fontSize: '13px', fontWeight: '700', color: '#fff', flexShrink: 0,
+                    cursor: 'pointer'
+                  }}
+                >{posterName.charAt(0).toUpperCase()}</div>
+                <div style={{ flex: 1 }}>
+                  <div
+                    onClick={() => router.push(`/users/${post.profiles?.username}`)}
+                    style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text1)', cursor: 'pointer' }}
+                  >{posterName}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    {post.rooms && (
+                      <span
+                        onClick={() => router.push(`/rooms/${post.room_id}`)}
+                        style={{ fontSize: '11px', color: 'var(--accent2)', cursor: 'pointer' }}
+                      >{post.rooms.emoji} {post.rooms.name}</span>
+                    )}
+                    <span style={{ fontSize: '11px', color: 'var(--text3)' }}>· {timeAgo(post.created_at)}</span>
                   </div>
                 </div>
+              </div>
 
-                {/* Content */}
-                {post.content && (
-                  <div style={{
-                    padding: '10px 14px', fontSize: '14px',
-                    color: 'var(--text2)', lineHeight: '1.65',
-                    whiteSpace: 'pre-wrap'
-                  }}>{post.content}</div>
-                )}
-
-                {/* Actions */}
+              {/* Content */}
+              {post.content && (
                 <div style={{
-                  display: 'flex', alignItems: 'center', gap: '2px',
-                  padding: '7px 10px', borderTop: '1px solid var(--border)'
+                  padding: '10px 14px', fontSize: '14px',
+                  color: 'var(--text2)', lineHeight: '1.65',
+                  whiteSpace: 'pre-wrap'
+                }}>{post.content}</div>
+              )}
+
+              {/* Actions */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '2px',
+                padding: '7px 10px', borderTop: '1px solid var(--border)'
+              }}>
+                <button onClick={() => toggleLike(post.id)} style={{
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  padding: '6px 10px', borderRadius: '8px', border: 'none',
+                  background: 'none', color: isLiked ? 'var(--red)' : 'var(--text3)',
+                  fontSize: '13px', fontWeight: '500', cursor: 'pointer', transition: 'all .18s'
                 }}>
-                  {/* Like */}
-                  <button onClick={() => toggleLike(post.id)} style={{
-                    display: 'flex', alignItems: 'center', gap: '5px',
-                    padding: '6px 10px', borderRadius: '8px', border: 'none',
-                    background: 'none', color: isLiked ? 'var(--red)' : 'var(--text3)',
-                    fontSize: '13px', fontWeight: '500', cursor: 'pointer',
-                    transition: 'all .18s'
-                  }}>
-                    {isLiked ? '❤️' : '🤍'} {post.like_count}
-                  </button>
+                  {isLiked ? '❤️' : '🤍'} {post.like_count}
+                </button>
 
-                  {/* Comment */}
-                  <button onClick={() => toggleComments(post.id)} style={{
-                    display: 'flex', alignItems: 'center', gap: '5px',
-                    padding: '6px 10px', borderRadius: '8px', border: 'none',
-                    background: 'none', color: 'var(--text3)',
-                    fontSize: '13px', fontWeight: '500', cursor: 'pointer'
-                  }}>
-                    💬 {post.comment_count}
-                  </button>
+                <button onClick={() => toggleComments(post.id)} style={{
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  padding: '6px 10px', borderRadius: '8px', border: 'none',
+                  background: 'none', color: showComments ? 'var(--accent2)' : 'var(--text3)',
+                  fontSize: '13px', fontWeight: '500', cursor: 'pointer'
+                }}>
+                  💬 {post.comment_count}
+                </button>
 
-                  {/* Save */}
-                  <button onClick={() => toggleSave(post.id)} style={{
-                    display: 'flex', alignItems: 'center', gap: '5px',
-                    padding: '6px 10px', borderRadius: '8px', border: 'none',
-                    background: 'none', color: isSaved ? 'var(--yellow)' : 'var(--text3)',
-                    fontSize: '13px', fontWeight: '500', cursor: 'pointer'
-                  }}>
-                    {isSaved ? '🔖' : '🔖'} {isSaved ? 'Saved' : 'Save'}
-                  </button>
+                <button onClick={() => toggleSave(post.id)} style={{
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  padding: '6px 10px', borderRadius: '8px', border: 'none',
+                  background: 'none', color: isSaved ? 'var(--yellow)' : 'var(--text3)',
+                  fontSize: '13px', fontWeight: '500', cursor: 'pointer'
+                }}>
+                  {isSaved ? '🔖' : '🔖'} {isSaved ? 'Saved' : 'Save'}
+                </button>
 
-                  {/* Share */}
-                  <button style={{
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/feed`)
+                  }}
+                  style={{
                     marginLeft: 'auto', padding: '6px 10px', borderRadius: '8px',
                     border: 'none', background: 'none', color: 'var(--text3)',
                     fontSize: '13px', cursor: 'pointer'
-                  }}>🔗</button>
-                </div>
-
-                {/* Comments section */}
-                {showComments && (
-                  <div style={{ borderTop: '1px solid var(--border)' }}>
-                    {/* Comment list */}
-                    <div style={{ padding: '8px 14px' }}>
-                      {(comments[post.id] || []).map((c: any) => (
-                        <div key={c.id} style={{ display: 'flex', gap: '8px', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                          <div style={{
-                            width: '26px', height: '26px', borderRadius: '50%',
-                            background: getColor(c.profiles?.name || 'U'), flexShrink: 0,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: '10px', fontWeight: '700', color: '#fff'
-                          }}>{(c.profiles?.name || 'U').charAt(0).toUpperCase()}</div>
-                          <div>
-                            <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text1)', marginRight: '6px' }}>
-                              {c.profiles?.name}
-                            </span>
-                            <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{c.content}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    {/* Comment input */}
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '9px 14px', borderTop: '1px solid var(--border)' }}>
-                      <div style={{
-                        width: '26px', height: '26px', borderRadius: '50%', background: color,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '10px', fontWeight: '700', color: '#fff', flexShrink: 0
-                      }}>{name.charAt(0).toUpperCase()}</div>
-                      <input
-                        value={commentInput[post.id] || ''}
-                        onChange={e => setCommentInput(prev => ({ ...prev, [post.id]: e.target.value }))}
-                        onKeyDown={e => e.key === 'Enter' && submitComment(post.id)}
-                        placeholder="Add a comment…"
-                        style={{
-                          flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)',
-                          borderRadius: '20px', padding: '7px 14px', color: 'var(--text1)',
-                          fontSize: '13px', outline: 'none', fontFamily: 'inherit'
-                        }}
-                      />
-                      <button
-                        onClick={() => submitComment(post.id)}
-                        style={{
-                          background: 'var(--accent)', border: 'none', borderRadius: '8px',
-                          color: '#fff', padding: '6px 12px', cursor: 'pointer', fontSize: '12px'
-                        }}
-                      >Post</button>
-                    </div>
-                  </div>
-                )}
+                  }}
+                >🔗</button>
               </div>
-            )
-          })
-        )}
+
+              {/* Comments */}
+              {showComments && (
+                <div style={{ borderTop: '1px solid var(--border)' }}>
+                  <div style={{ padding: '8px 14px' }}>
+                    {(comments[post.id] || []).length === 0 && (
+                      <div style={{ fontSize: '12px', color: 'var(--text3)', padding: '6px 0' }}>
+                        No comments yet. Be the first!
+                      </div>
+                    )}
+                    {(comments[post.id] || []).map((c: any) => (
+                      <div key={c.id} style={{
+                        display: 'flex', gap: '8px', padding: '7px 0',
+                        borderBottom: '1px solid var(--border)'
+                      }}>
+                        <div style={{
+                          width: '26px', height: '26px', borderRadius: '50%',
+                          background: getColor(c.profiles?.name || 'U'), flexShrink: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '10px', fontWeight: '700', color: '#fff'
+                        }}>{(c.profiles?.name || 'U').charAt(0).toUpperCase()}</div>
+                        <div>
+                          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text1)', marginRight: '6px' }}>
+                            {c.profiles?.name}
+                          </span>
+                          <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{c.content}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{
+                    display: 'flex', gap: '8px', alignItems: 'center',
+                    padding: '9px 14px', borderTop: '1px solid var(--border)'
+                  }}>
+                    <div style={{
+                      width: '26px', height: '26px', borderRadius: '50%', background: color,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '10px', fontWeight: '700', color: '#fff', flexShrink: 0
+                    }}>{name.charAt(0).toUpperCase()}</div>
+                    <input
+                      value={commentInput[post.id] || ''}
+                      onChange={e => setCommentInput(prev => ({ ...prev, [post.id]: e.target.value }))}
+                      onKeyDown={e => e.key === 'Enter' && submitComment(post.id)}
+                      placeholder="Add a comment…"
+                      style={{
+                        flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)',
+                        borderRadius: '20px', padding: '7px 14px', color: 'var(--text1)',
+                        fontSize: '13px', outline: 'none', fontFamily: 'inherit'
+                      }}
+                    />
+                    <button
+                      onClick={() => submitComment(post.id)}
+                      style={{
+                        background: 'var(--accent)', border: 'none', borderRadius: '8px',
+                        color: '#fff', padding: '6px 12px', cursor: 'pointer', fontSize: '12px'
+                      }}
+                    >Post</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {/* Create Post Modal */}
@@ -310,23 +341,32 @@ export default function FeedClient({ posts: initialPosts, likedIds, profile, roo
             background: 'var(--bg2)', border: '1px solid var(--border2)',
             borderRadius: '20px', padding: '28px', width: '100%', maxWidth: '500px'
           }} className="fade-up">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+              <div style={{ fontWeight: '700', fontSize: '16px' }}>Create Post</div>
+              <button onClick={() => setCreating(false)} style={{
+                background: 'none', border: 'none', color: 'var(--text3)',
+                cursor: 'pointer', fontSize: '20px', lineHeight: 1
+              }}>×</button>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
               <div style={{
                 width: '36px', height: '36px', borderRadius: '50%', background: color,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: '14px', fontWeight: '700', color: '#fff'
               }}>{name.charAt(0).toUpperCase()}</div>
               <div>
-                <div style={{ fontWeight: '600', fontSize: '14px' }}>{name}</div>
+                <div style={{ fontWeight: '600', fontSize: '13px' }}>{name}</div>
                 <select
                   value={postForm.room_id}
                   onChange={e => setPostForm(prev => ({ ...prev, room_id: e.target.value }))}
                   style={{
                     background: 'var(--bg3)', border: '1px solid var(--border)',
                     borderRadius: '6px', padding: '3px 8px', color: 'var(--accent2)',
-                    fontSize: '12px', outline: 'none', cursor: 'pointer'
+                    fontSize: '12px', outline: 'none', cursor: 'pointer', marginTop: '2px'
                   }}
                 >
+                  {rooms.length === 0 && <option value="">No rooms — join one first</option>}
                   {rooms.map((r: any) => (
                     <option key={r.id} value={r.id}>{r.emoji} {r.name}</option>
                   ))}
@@ -338,7 +378,8 @@ export default function FeedClient({ posts: initialPosts, likedIds, profile, roo
               value={postForm.content}
               onChange={e => setPostForm(prev => ({ ...prev, content: e.target.value }))}
               placeholder="What's on your mind?"
-              rows={4}
+              rows={5}
+              autoFocus
               style={{
                 width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)',
                 borderRadius: '10px', padding: '12px', color: 'var(--text1)',
@@ -364,7 +405,7 @@ export default function FeedClient({ posts: initialPosts, likedIds, profile, roo
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
                 }}
               >
-                {posting ? <><div className="spinner" />Posting…</> : 'Post'}
+                {posting ? <><div className="spinner" />Posting…</> : '✓ Post'}
               </button>
             </div>
           </div>
