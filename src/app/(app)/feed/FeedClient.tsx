@@ -18,7 +18,7 @@ function timeAgo(date: string) {
   return `${Math.floor(s/86400)}d ago`
 }
 
-export default function FeedClient({ posts: initialPosts, likedIds, savedIds, profile, rooms, currentUserId }: any) {
+export default function FeedClient({ posts: initialPosts, likedIds, savedIds, profile, rooms, currentUserId, isNewUser, suggestedRooms }: any) {
   const [posts, setPosts] = useState(initialPosts)
   const [liked, setLiked] = useState<Set<string>>(new Set(likedIds))
   const [saved, setSaved] = useState<Set<string>>(new Set(savedIds))
@@ -102,6 +102,12 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
         .order('created_at', { ascending: true })
       setComments(prev => ({ ...prev, [postId]: data || [] }))
     }
+  }
+
+  async function deletePost(postId: string) {
+    if (!confirm('Delete this post? This cannot be undone.')) return
+    await supabase.from('posts').delete().eq('id', postId).eq('user_id', currentUserId)
+    setPosts((prev: any[]) => prev.filter((p: any) => p.id !== postId))
   }
 
   async function submitComment(postId: string) {
@@ -193,6 +199,44 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
           </div>
         </div>
 
+        {/* New user banner */}
+        {isNewUser && posts.length > 0 && (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(99,102,241,.12), rgba(168,85,247,.08))',
+            border: '1px solid rgba(99,102,241,.25)', borderRadius: '13px',
+            padding: '18px', marginBottom: '16px'
+          }}>
+            <div style={{ fontWeight: '700', fontSize: '15px', marginBottom: '5px' }}>
+              👋 Welcome to Rooms!
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '12px', lineHeight: '1.6' }}>
+              You're seeing trending posts. Join rooms to personalise your feed.
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {suggestedRooms.slice(0, 3).map((r: any) => (
+                <button
+                  key={r.id}
+                  onClick={() => router.push(`/rooms/${r.id}`)}
+                  style={{
+                    padding: '6px 13px', background: 'var(--accentbg, rgba(99,102,241,.1))',
+                    border: '1px solid var(--accentbdr, rgba(99,102,241,.28))',
+                    borderRadius: '20px', color: 'var(--accent2)', fontSize: '12px',
+                    fontWeight: '500', cursor: 'pointer'
+                  }}
+                >{r.emoji} {r.name}</button>
+              ))}
+              <button
+                onClick={() => router.push('/explore')}
+                style={{
+                  padding: '6px 13px', background: 'var(--accent)',
+                  border: 'none', borderRadius: '20px', color: '#fff',
+                  fontSize: '12px', fontWeight: '500', cursor: 'pointer'
+                }}
+              >Browse all →</button>
+            </div>
+          </div>
+        )}
+
         {/* Empty state */}
         {posts.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>
@@ -233,12 +277,18 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
                 <div
                   onClick={() => router.push(`/users/${post.profiles?.username}`)}
                   style={{
-                    width: '36px', height: '36px', borderRadius: '50%', background: posterColor,
+                    width: '36px', height: '36px', borderRadius: '50%',
+                    background: post.profiles?.avatar_url ? 'none' : posterColor,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '13px', fontWeight: '700', color: '#fff', flexShrink: 0,
-                    cursor: 'pointer'
+                    cursor: 'pointer', overflow: 'hidden'
                   }}
-                >{posterName.charAt(0).toUpperCase()}</div>
+                >
+                  {post.profiles?.avatar_url
+                    ? <img src={post.profiles.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : posterName.charAt(0).toUpperCase()
+                  }
+                </div>
                 <div style={{ flex: 1 }}>
                   <div
                     onClick={() => router.push(`/users/${post.profiles?.username}`)}
@@ -254,6 +304,19 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
                     <span style={{ fontSize: '11px', color: 'var(--text3)' }}>· {timeAgo(post.created_at)}</span>
                   </div>
                 </div>
+                {post.user_id === currentUserId && (
+                  <button
+                    onClick={() => deletePost(post.id)}
+                    title="Delete post"
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'var(--text3)', padding: '4px', fontSize: '14px',
+                      borderRadius: '6px', transition: 'color .18s'
+                    }}
+                    onMouseOver={e => (e.currentTarget as HTMLElement).style.color = 'var(--red)'}
+                    onMouseOut={e => (e.currentTarget as HTMLElement).style.color = 'var(--text3)'}
+                  >🗑</button>
+                )}
               </div>
 
               {/* Content */}

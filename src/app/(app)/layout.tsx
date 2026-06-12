@@ -31,22 +31,52 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
+    let channel: any = null
+
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       setProfile(data)
-      // Unread notifications
-      const { count: nc } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('read', false)
+
+      // Unread notifications count
+      const { count: nc } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('read', false)
       setNotifCount(nc || 0)
+
+      // Real-time notification listener
+      channel = supabase
+        .channel(`notifs:${user.id}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        }, () => {
+          setNotifCount(prev => prev + 1)
+        })
+        .subscribe()
     }
+
     load()
+
+    return () => {
+      if (channel) supabase.removeChannel(channel)
+    }
   }, [pathname])
 
   async function signOut() {
     await supabase.auth.signOut()
     router.push('/login')
   }
+
+  // Reset badge when visiting notifications page
+  useEffect(() => {
+    if (pathname === '/notifications') setNotifCount(0)
+  }, [pathname])
 
   const activeId = NAV.find(n => pathname.startsWith(n.path))?.id || 'feed'
   const isRoom = pathname.startsWith('/rooms/')
