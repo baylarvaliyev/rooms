@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
@@ -28,6 +28,28 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
   const supabase = createClient()
 
   const color = getColor(profile?.name || 'U')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || '')
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) { alert('Image must be under 5MB'); return }
+    setUploadingAvatar(true)
+    const ext = file.name.split('.').pop()
+    const path = `${profile.id}/avatar.${ext}`
+    const { data, error } = await supabase.storage
+      .from('avatars')
+      .upload(path, file, { cacheControl: '3600', upsert: true })
+    if (!error && data) {
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
+      const url = urlData.publicUrl + '?t=' + Date.now()
+      await supabase.from('profiles').update({ avatar_url: url }).eq('id', profile.id)
+      setAvatarUrl(url)
+    }
+    setUploadingAvatar(false)
+  }
 
   async function saveProfile() {
     setSaving(true)
@@ -79,13 +101,31 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
 
           {/* Avatar + info */}
           <div style={{ padding: '0 20px 20px', position: 'relative' }}>
-            <div style={{
-              width: '76px', height: '76px', borderRadius: '50%',
-              background: color, border: '3px solid var(--bg2)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '28px', fontWeight: '800', color: '#fff',
-              marginTop: '-38px', marginBottom: '12px'
-            }}>{(profile?.name || 'U').charAt(0).toUpperCase()}</div>
+            <div style={{ position: 'relative', width: '76px', marginTop: '-38px', marginBottom: '12px' }}>
+              <div style={{
+                width: '76px', height: '76px', borderRadius: '50%',
+                background: color, border: '3px solid var(--bg2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '28px', fontWeight: '800', color: '#fff',
+                overflow: 'hidden', flexShrink: 0
+              }}>
+                {avatarUrl
+                  ? <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : (profile?.name || 'U').charAt(0).toUpperCase()
+                }
+              </div>
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  position: 'absolute', bottom: '0', right: '0',
+                  width: '24px', height: '24px', borderRadius: '50%',
+                  background: 'var(--accent)', border: '2px solid var(--bg2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', fontSize: '12px'
+                }}
+              >{uploadingAvatar ? '…' : '📷'}</div>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} style={{ display: 'none' }} />
+            </div>
 
             {editing ? (
               <div>
