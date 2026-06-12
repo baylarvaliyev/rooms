@@ -4,6 +4,7 @@ import RoomClient from './RoomClient'
 import DebateRoom from './DebateRoom'
 import PinterestRoom from './PinterestRoom'
 import VoiceRoom from './VoiceRoom'
+import MusicRoom from './MusicRoom'
 
 export default async function RoomPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -51,6 +52,10 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
 
   if (room.type === 'voice') {
     return <VoiceRoom room={room} members={members || []} currentUser={currentUser} isMember={isMember} />
+  }
+
+  if (room.type === 'music') {
+    return <MusicRoom room={room} members={members || []} currentUser={currentUser} isMember={isMember} />
   }
 
   return (
