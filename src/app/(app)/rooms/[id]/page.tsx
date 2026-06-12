@@ -1,6 +1,9 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import RoomClient from './RoomClient'
+import DebateRoom from './DebateRoom'
+import PinterestRoom from './PinterestRoom'
+import VoiceRoom from './VoiceRoom'
 
 export default async function RoomPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -35,13 +38,28 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
     .eq('user_id', user.id)
     .single()
 
+  const currentUser = { id: user.id, ...user.user_metadata }
+  const isMember = !!membership
+
+  if (room.type === 'debate') {
+    return <DebateRoom room={room} currentUser={currentUser} isMember={isMember} />
+  }
+
+  if (room.type === 'pinterest') {
+    return <PinterestRoom room={room} currentUser={currentUser} isMember={isMember} />
+  }
+
+  if (room.type === 'voice') {
+    return <VoiceRoom room={room} members={members || []} currentUser={currentUser} isMember={isMember} />
+  }
+
   return (
     <RoomClient
       room={room}
       initialMessages={messages || []}
       members={members || []}
-      currentUser={{ id: user.id, ...user.user_metadata }}
-      isMember={!!membership}
+      currentUser={currentUser}
+      isMember={isMember}
     />
   )
 }

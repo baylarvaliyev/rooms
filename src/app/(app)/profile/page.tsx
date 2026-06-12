@@ -34,6 +34,11 @@ export default async function ProfilePage() {
     .select('*', { count: 'exact', head: true })
     .eq('follower_id', user.id)
 
+  const { data: achievements } = await supabase
+    .from('achievements')
+    .select('*')
+    .eq('user_id', user.id)
+
   return (
     <ProfileClient
       profile={profile}
@@ -41,6 +46,7 @@ export default async function ProfilePage() {
       rooms={rooms || []}
       followersCount={followersCount || 0}
       followingCount={followingCount || 0}
+      achievements={achievements || []}
     />
   )
 }

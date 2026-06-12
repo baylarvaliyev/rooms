@@ -18,19 +18,60 @@ function timeAgo(date: string) {
   return `${Math.floor(s/86400)}d ago`
 }
 
-export default function ProfileClient({ profile, posts, rooms, followersCount, followingCount }: any) {
-  const [tab, setTab] = useState<'posts' | 'rooms'>('posts')
+const ACHIEVEMENT_META: Record<string, { icon: string, label: string, desc: string, color: string }> = {
+  first_post:     { icon: '✍️', label: 'First Post',      desc: 'Published your first post',        color: '#6366f1' },
+  prolific_poster:{ icon: '📝', label: 'Prolific Poster', desc: 'Published 10 posts',                color: '#0891b2' },
+  viral:          { icon: '🔥', label: 'Viral',           desc: 'Received 50 likes',                 color: '#ef4444' },
+  influencer:     { icon: '⭐', label: 'Influencer',      desc: 'Gained 10 followers',               color: '#eab308' },
+  room_explorer:  { icon: '🧭', label: 'Room Explorer',   desc: 'Joined 5 rooms',                    color: '#0f766e' },
+  rising_star:    { icon: '🌟', label: 'Rising Star',     desc: 'Reached 100 reputation',            color: '#f97316' },
+  elite:          { icon: '👑', label: 'Elite',           desc: 'Reached 1000 reputation',           color: '#a855f7' },
+}
+
+const ALL_ACHIEVEMENTS = Object.keys(ACHIEVEMENT_META)
+
+const ROOM_COLORS: Record<string, string> = {
+  Business: 'linear-gradient(135deg,#0a1e3a,#1a3a6e)',
+  Technology: 'linear-gradient(135deg,#1e0a3a,#3d1a5e)',
+  Music: 'linear-gradient(135deg,#3a0a1e,#6e1a3e)',
+  Study: 'linear-gradient(135deg,#0a2a1a,#1a4a30)',
+  Travel: 'linear-gradient(135deg,#1e1a00,#3a3200)',
+  Art: 'linear-gradient(135deg,#2a0a1a,#5e1a30)',
+  Fitness: 'linear-gradient(135deg,#0a2a0a,#1a4a1a)',
+  Finance: 'linear-gradient(135deg,#2a1a00,#4e3200)',
+  Cars: 'linear-gradient(135deg,#3a0a0a,#6e1a1a)',
+  Lifestyle: 'linear-gradient(135deg,#0a0a2a,#1a1a4e)',
+}
+
+function getLevel(rep: number) {
+  if (rep >= 5000) return { level: 10, title: 'Legend', next: null }
+  if (rep >= 2000) return { level: 8, title: 'Expert', next: 5000 }
+  if (rep >= 1000) return { level: 7, title: 'Elite', next: 2000 }
+  if (rep >= 500)  return { level: 6, title: 'Pro', next: 1000 }
+  if (rep >= 200)  return { level: 5, title: 'Active', next: 500 }
+  if (rep >= 100)  return { level: 4, title: 'Rising Star', next: 200 }
+  if (rep >= 50)   return { level: 3, title: 'Contributor', next: 100 }
+  if (rep >= 20)   return { level: 2, title: 'Member', next: 50 }
+  return { level: 1, title: 'Newcomer', next: 20 }
+}
+
+export default function ProfileClient({ profile, posts, rooms, followersCount, followingCount, achievements }: any) {
+  const [tab, setTab] = useState<'posts' | 'rooms' | 'achievements'>('posts')
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(profile?.name || '')
   const [bio, setBio] = useState(profile?.bio || '')
   const [saving, setSaving] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || '')
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
 
   const color = getColor(profile?.name || 'U')
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || '')
-  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const rep = profile?.reputation || 0
+  const { level, title, next } = getLevel(rep)
+  const progress = next ? Math.min(100, (rep / next) * 100) : 100
+  const earnedTypes = new Set((achievements || []).map((a: any) => a.type))
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -59,55 +100,39 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
     router.refresh()
   }
 
-  const ROOM_COLORS: Record<string, string> = {
-    Business: 'linear-gradient(135deg,#0a1e3a,#1a3a6e)',
-    Technology: 'linear-gradient(135deg,#1e0a3a,#3d1a5e)',
-    Music: 'linear-gradient(135deg,#3a0a1e,#6e1a3e)',
-    Study: 'linear-gradient(135deg,#0a2a1a,#1a4a30)',
-    Travel: 'linear-gradient(135deg,#1e1a00,#3a3200)',
-    Art: 'linear-gradient(135deg,#2a0a1a,#5e1a30)',
-    Fitness: 'linear-gradient(135deg,#0a2a0a,#1a4a1a)',
-    Finance: 'linear-gradient(135deg,#2a1a00,#4e3200)',
-    Cars: 'linear-gradient(135deg,#3a0a0a,#6e1a1a)',
-    Lifestyle: 'linear-gradient(135deg,#0a0a2a,#1a1a4e)',
-  }
-
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '22px' }}>
-      <div style={{ maxWidth: '680px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '700px', margin: '0 auto' }}>
 
         {/* Profile card */}
         <div style={{
           background: 'var(--bg2)', border: '1px solid var(--border)',
-          borderRadius: '16px', overflow: 'hidden', marginBottom: '20px'
+          borderRadius: '16px', overflow: 'hidden', marginBottom: '16px'
         }}>
           {/* Cover */}
           <div style={{
             height: '140px',
-            background: `linear-gradient(135deg, ${color}44, ${color}22)`,
+            background: `linear-gradient(135deg, ${color}44, ${color}11)`,
             position: 'relative'
           }}>
-            <button
-              onClick={() => setEditing(!editing)}
-              style={{
-                position: 'absolute', top: '12px', right: '12px',
-                padding: '6px 14px', background: 'rgba(0,0,0,.4)',
-                backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,.15)',
-                borderRadius: '8px', color: '#fff', fontSize: '12px',
-                cursor: 'pointer', fontWeight: '500'
-              }}
-            >{editing ? 'Cancel' : '✏️ Edit profile'}</button>
+            <button onClick={() => setEditing(!editing)} style={{
+              position: 'absolute', top: '12px', right: '12px',
+              padding: '6px 14px', background: 'rgba(0,0,0,.4)',
+              backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,.15)',
+              borderRadius: '8px', color: '#fff', fontSize: '12px',
+              cursor: 'pointer', fontWeight: '500'
+            }}>{editing ? 'Cancel' : '✏️ Edit profile'}</button>
           </div>
 
-          {/* Avatar + info */}
           <div style={{ padding: '0 20px 20px', position: 'relative' }}>
+            {/* Avatar */}
             <div style={{ position: 'relative', width: '76px', marginTop: '-38px', marginBottom: '12px' }}>
               <div style={{
                 width: '76px', height: '76px', borderRadius: '50%',
-                background: color, border: '3px solid var(--bg2)',
+                background: avatarUrl ? 'none' : color,
+                border: '3px solid var(--bg2)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '28px', fontWeight: '800', color: '#fff',
-                overflow: 'hidden', flexShrink: 0
+                fontSize: '28px', fontWeight: '800', color: '#fff', overflow: 'hidden'
               }}>
                 {avatarUrl
                   ? <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -117,11 +142,11 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
               <div
                 onClick={() => fileInputRef.current?.click()}
                 style={{
-                  position: 'absolute', bottom: '0', right: '0',
+                  position: 'absolute', bottom: 0, right: 0,
                   width: '24px', height: '24px', borderRadius: '50%',
                   background: 'var(--accent)', border: '2px solid var(--bg2)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', fontSize: '12px'
+                  cursor: 'pointer', fontSize: '11px'
                 }}
               >{uploadingAvatar ? '…' : '📷'}</div>
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} style={{ display: 'none' }} />
@@ -131,46 +156,24 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
               <div>
                 <div style={{ marginBottom: '10px' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>Name</label>
-                  <input
-                    value={name} onChange={e => setName(e.target.value)}
-                    style={{
-                      width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)',
-                      borderRadius: '8px', padding: '8px 12px', color: 'var(--text1)',
-                      fontSize: '13px', outline: 'none'
-                    }}
-                  />
+                  <input value={name} onChange={e => setName(e.target.value)} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text1)', fontSize: '13px', outline: 'none' }} />
                 </div>
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>Bio</label>
-                  <textarea
-                    value={bio} onChange={e => setBio(e.target.value)}
-                    rows={2}
-                    style={{
-                      width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)',
-                      borderRadius: '8px', padding: '8px 12px', color: 'var(--text1)',
-                      fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit'
-                    }}
-                  />
+                  <textarea value={bio} onChange={e => setBio(e.target.value)} rows={2} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text1)', fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
                 </div>
-                <button onClick={saveProfile} disabled={saving} style={{
-                  padding: '8px 20px', background: 'var(--accent)', border: 'none',
-                  borderRadius: '8px', color: '#fff', fontSize: '13px',
-                  fontWeight: '600', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '6px'
-                }}>
+                <button onClick={saveProfile} disabled={saving} style={{ padding: '8px 20px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   {saving ? <><div className="spinner" />Saving…</> : 'Save changes'}
                 </button>
               </div>
             ) : (
               <>
                 <div style={{ fontWeight: '700', fontSize: '20px', marginBottom: '2px' }}>{profile?.name}</div>
-                <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '8px' }}>@{profile?.username}</div>
-                {profile?.bio && (
-                  <div style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '14px', lineHeight: '1.6' }}>
-                    {profile.bio}
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: '20px' }}>
+                <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '6px' }}>@{profile?.username}</div>
+                {profile?.bio && <div style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: '1.6', marginBottom: '12px' }}>{profile.bio}</div>}
+
+                {/* Stats */}
+                <div style={{ display: 'flex', gap: '20px', marginBottom: '16px', flexWrap: 'wrap' }}>
                   {[
                     [posts.length, 'Posts'],
                     [rooms.length, 'Rooms'],
@@ -188,12 +191,47 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Reputation card */}
         <div style={{
-          display: 'flex', gap: '2px', borderBottom: '1px solid var(--border)',
-          marginBottom: '18px'
+          background: 'var(--bg2)', border: '1px solid var(--border)',
+          borderRadius: '13px', padding: '16px', marginBottom: '16px'
         }}>
-          {(['posts', 'rooms'] as const).map(t => (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text1)', display: 'flex', alignItems: 'center', gap: '7px' }}>
+                ⭐ Reputation
+                <span style={{
+                  fontSize: '11px', padding: '2px 8px', borderRadius: '20px',
+                  background: 'var(--accentbg, rgba(99,102,241,.1))',
+                  color: 'var(--accent2)', fontWeight: '500'
+                }}>Level {level} · {title}</span>
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
+                {next ? `${rep} / ${next} pts to Level ${level + 1}` : 'Max level reached! 👑'}
+              </div>
+            </div>
+            <div style={{ fontWeight: '800', fontSize: '22px', color: 'var(--accent2)' }}>
+              {rep.toLocaleString()} pts
+            </div>
+          </div>
+          <div style={{ height: '6px', background: 'var(--bg5, #242a38)', borderRadius: '3px', overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', borderRadius: '3px',
+              background: 'linear-gradient(90deg, var(--accent), var(--purple, #a855f7))',
+              width: `${progress}%`, transition: 'width 1s ease'
+            }} />
+          </div>
+          <div style={{ display: 'flex', gap: '16px', marginTop: '10px', fontSize: '12px', color: 'var(--text3)' }}>
+            <span>+2 pts per post</span>
+            <span>+5 pts per like received</span>
+            <span>+3 pts per comment received</span>
+            <span>+10 pts per follower</span>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: '2px', borderBottom: '1px solid var(--border)', marginBottom: '18px' }}>
+          {(['posts', 'rooms', 'achievements'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} style={{
               padding: '9px 18px', border: 'none', background: 'none',
               color: tab === t ? 'var(--accent2)' : 'var(--text3)',
@@ -211,30 +249,24 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
               <div style={{ fontSize: '32px', marginBottom: '10px' }}>✍️</div>
               <div style={{ fontSize: '14px', color: 'var(--text2)' }}>No posts yet</div>
             </div>
-          ) : (
-            posts.map((post: any) => (
-              <div key={post.id} style={{
-                background: 'var(--bg2)', border: '1px solid var(--border)',
-                borderRadius: '12px', padding: '14px', marginBottom: '12px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                  {post.rooms && (
-                    <span style={{ fontSize: '12px', color: 'var(--accent2)' }}>
-                      {post.rooms.emoji} {post.rooms.name}
-                    </span>
-                  )}
-                  <span style={{ fontSize: '11px', color: 'var(--text3)' }}>· {timeAgo(post.created_at)}</span>
-                </div>
-                <div style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: '1.65', whiteSpace: 'pre-wrap' }}>
-                  {post.content}
-                </div>
-                <div style={{ display: 'flex', gap: '14px', marginTop: '10px' }}>
-                  <span style={{ fontSize: '12px', color: 'var(--text3)' }}>❤️ {post.like_count}</span>
-                  <span style={{ fontSize: '12px', color: 'var(--text3)' }}>💬 {post.comment_count}</span>
-                </div>
+          ) : posts.map((post: any) => (
+            <div key={post.id} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                {post.rooms && <span style={{ fontSize: '12px', color: 'var(--accent2)' }}>{post.rooms.emoji} {post.rooms.name}</span>}
+                <span style={{ fontSize: '11px', color: 'var(--text3)' }}>· {timeAgo(post.created_at)}</span>
               </div>
-            ))
-          )
+              <div style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: '1.65', whiteSpace: 'pre-wrap', marginBottom: post.media_url ? '10px' : '0' }}>
+                {post.content}
+              </div>
+              {post.media_url && (
+                <img src={post.media_url} alt="" style={{ width: '100%', maxHeight: '300px', objectFit: 'cover', borderRadius: '8px', display: 'block' }} />
+              )}
+              <div style={{ display: 'flex', gap: '14px', marginTop: '10px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text3)' }}>❤️ {post.like_count}</span>
+                <span style={{ fontSize: '12px', color: 'var(--text3)' }}>💬 {post.comment_count}</span>
+              </div>
+            </div>
+          ))
         )}
 
         {/* Rooms tab */}
@@ -243,6 +275,7 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
             <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text3)' }}>
               <div style={{ fontSize: '32px', marginBottom: '10px' }}>🚪</div>
               <div style={{ fontSize: '14px', color: 'var(--text2)' }}>No rooms joined yet</div>
+              <button onClick={() => router.push('/explore')} style={{ marginTop: '12px', padding: '8px 18px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', cursor: 'pointer' }}>Explore Rooms</button>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
@@ -250,23 +283,11 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
                 const r = m.rooms
                 if (!r) return null
                 return (
-                  <div
-                    key={m.id}
-                    onClick={() => router.push(`/rooms/${r.id}`)}
-                    style={{
-                      background: 'var(--bg2)', border: '1px solid var(--border)',
-                      borderRadius: '12px', overflow: 'hidden', cursor: 'pointer',
-                      transition: 'all .2s'
-                    }}
+                  <div key={m.id} onClick={() => router.push(`/rooms/${r.id}`)} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden', cursor: 'pointer', transition: 'all .2s' }}
                     onMouseOver={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.11)'}
                     onMouseOut={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.06)'}
                   >
-                    <div style={{
-                      height: '70px',
-                      background: ROOM_COLORS[r.category] || 'var(--bg3)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '32px'
-                    }}>{r.emoji}</div>
+                    <div style={{ height: '70px', background: ROOM_COLORS[r.category] || 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>{r.emoji}</div>
                     <div style={{ padding: '10px' }}>
                       <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '3px' }}>{r.name}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{r.member_count || 0} members</div>
@@ -276,6 +297,37 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
               })}
             </div>
           )
+        )}
+
+        {/* Achievements tab */}
+        {tab === 'achievements' && (
+          <div>
+            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '14px' }}>
+              {earnedTypes.size} of {ALL_ACHIEVEMENTS.length} achievements earned
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
+              {ALL_ACHIEVEMENTS.map(type => {
+                const meta = ACHIEVEMENT_META[type]
+                const earned = earnedTypes.has(type)
+                return (
+                  <div key={type} style={{
+                    background: earned ? `${meta.color}11` : 'var(--bg2)',
+                    border: `1px solid ${earned ? meta.color + '44' : 'var(--border)'}`,
+                    borderRadius: '12px', padding: '14px',
+                    opacity: earned ? 1 : 0.45,
+                    transition: 'all .2s'
+                  }}>
+                    <div style={{ fontSize: '28px', marginBottom: '8px' }}>{meta.icon}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: earned ? 'var(--text1)' : 'var(--text2)', marginBottom: '3px' }}>{meta.label}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{meta.desc}</div>
+                    {earned && (
+                      <div style={{ fontSize: '10px', color: meta.color, marginTop: '6px', fontWeight: '600' }}>✓ Earned</div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         )}
       </div>
     </div>
