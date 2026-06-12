@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
@@ -28,8 +28,31 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
   const [creating, setCreating] = useState(false)
   const [postForm, setPostForm] = useState({ content: '', room_id: rooms[0]?.id || '', type: 'post' })
   const [posting, setPosting] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
   const router = useRouter()
+
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image must be under 10MB')
+      return
+    }
+    setImageFile(file)
+    const reader = new FileReader()
+    reader.onload = () => setImagePreview(reader.result as string)
+    reader.readAsDataURL(file)
+  }
+
+  function removeImage() {
+    setImageFile(null)
+    setImagePreview(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
 
   async function toggleLike(postId: string) {
     const isLiked = liked.has(postId)
@@ -99,15 +122,35 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
   async function createPost() {
     if (!postForm.content.trim() || !postForm.room_id) return
     setPosting(true)
+    let mediaUrl = ''
+
+    // Upload image if selected
+    if (imageFile) {
+      const ext = imageFile.name.split('.').pop()
+      const path = `${currentUserId}/${Date.now()}.${ext}`
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('posts')
+        .upload(path, imageFile, { cacheControl: '3600', upsert: false })
+      
+      if (!uploadError && uploadData) {
+        const { data: urlData } = supabase.storage.from('posts').getPublicUrl(path)
+        mediaUrl = urlData.publicUrl
+      }
+    }
+
     const { data } = await supabase.from('posts').insert({
       content: postForm.content,
       room_id: postForm.room_id,
       user_id: currentUserId,
-      type: postForm.type,
+      type: imageFile ? 'photo' : 'post',
+      media_url: mediaUrl,
     }).select('*, profiles(name, username), rooms(name, emoji, category)').single()
+
     if (data) {
       setPosts((prev: any[]) => [data, ...prev])
       setPostForm({ content: '', room_id: rooms[0]?.id || '', type: 'post' })
+      setImageFile(null)
+      setImagePreview(null)
       setCreating(false)
     }
     setPosting(false)
@@ -220,6 +263,19 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
                   color: 'var(--text2)', lineHeight: '1.65',
                   whiteSpace: 'pre-wrap'
                 }}>{post.content}</div>
+              )}
+              {/* Image */}
+              {post.media_url && (
+                <div style={{ padding: '0 0 2px' }}>
+                  <img
+                    src={post.media_url}
+                    alt="Post image"
+                    style={{
+                      width: '100%', maxHeight: '500px',
+                      objectFit: 'cover', display: 'block'
+                    }}
+                  />
+                </div>
               )}
 
               {/* Actions */}
@@ -378,15 +434,53 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
               value={postForm.content}
               onChange={e => setPostForm(prev => ({ ...prev, content: e.target.value }))}
               placeholder="What's on your mind?"
-              rows={5}
+              rows={4}
               autoFocus
               style={{
                 width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)',
                 borderRadius: '10px', padding: '12px', color: 'var(--text1)',
                 fontSize: '14px', outline: 'none', resize: 'none', fontFamily: 'inherit',
-                lineHeight: '1.6', marginBottom: '14px'
+                lineHeight: '1.6', marginBottom: '10px'
               }}
             />
+
+            {/* Image preview */}
+            {imagePreview && (
+              <div style={{ position: 'relative', marginBottom: '10px', borderRadius: '10px', overflow: 'hidden' }}>
+                <img src={imagePreview} alt="Preview" style={{ width: '100%', maxHeight: '260px', objectFit: 'cover', display: 'block' }} />
+                <button
+                  onClick={removeImage}
+                  style={{
+                    position: 'absolute', top: '8px', right: '8px',
+                    width: '28px', height: '28px', borderRadius: '50%',
+                    background: 'rgba(0,0,0,.6)', border: 'none',
+                    color: '#fff', cursor: 'pointer', fontSize: '16px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}
+                >×</button>
+              </div>
+            )}
+
+            {/* Upload button */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                style={{ display: 'none' }}
+                id="image-upload"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  padding: '7px 14px', background: 'var(--bg3)',
+                  border: '1px solid var(--border)', borderRadius: '8px',
+                  color: 'var(--text2)', fontSize: '12px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '5px'
+                }}
+              >📷 Add photo</button>
+            </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={() => setCreating(false)} style={{
