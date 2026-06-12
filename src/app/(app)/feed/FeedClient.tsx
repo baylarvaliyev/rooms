@@ -33,6 +33,11 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(initialPosts.length === 30)
   const [page, setPage] = useState(0)
+  // Poll state
+  const [postType, setPostType] = useState<'post' | 'poll'>('post')
+  const [pollQuestion, setPollQuestion] = useState('')
+  const [pollOptions, setPollOptions] = useState(['', ''])
+  const [pollVotes, setPollVotes] = useState<Record<string, number>>({}) // pollId -> optionIndex voted
   const fileInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
@@ -136,6 +141,22 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
   async function createPost() {
     if (!postForm.content.trim() || !postForm.room_id) return
     setPosting(true)
+
+    if (postType === 'poll') {
+      const validOptions = pollOptions.filter(o => o.trim())
+      if (!pollQuestion.trim() || validOptions.length < 2) { setPosting(false); return }
+      const { data: post } = await supabase.from('posts').insert({
+        content: postForm.content, room_id: postForm.room_id, user_id: currentUserId, type: 'poll'
+      }).select('*, profiles(name, username, avatar_url), rooms(name, emoji, category)').single()
+      if (post) {
+        await supabase.from('polls').insert({ post_id: post.id, question: pollQuestion, options: validOptions.map(o => ({ text: o, votes: 0 })) })
+        setPosts((prev: any[]) => [post, ...prev])
+      }
+      setPostForm({ content: '', room_id: rooms[0]?.id || '', type: 'post' })
+      setPollQuestion(''); setPollOptions(['', '']); setPostType('post'); setCreating(false)
+      setPosting(false); return
+    }
+
     let mediaUrl = ''
     if (imageFile) {
       const ext = imageFile.name.split('.').pop()
@@ -156,6 +177,37 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
       setImageFile(null); setImagePreview(null); setCreating(false)
     }
     setPosting(false)
+  }
+
+  async function votePoll(pollId: string, postId: string, optionIndex: number, currentOptions: any[]) {
+    const prevVote = pollVotes[pollId]
+    setPollVotes(prev => ({ ...prev, [pollId]: optionIndex }))
+    // Update local post poll data optimistically
+    setPosts((prev: any[]) => prev.map(p => {
+      if (p.id !== postId || !p._poll) return p
+      const newOptions = p._poll.options.map((o: any, i: number) => ({
+        ...o,
+        votes: i === optionIndex ? o.votes + 1 : (i === prevVote ? o.votes - 1 : o.votes)
+      }))
+      return { ...p, _poll: { ...p._poll, options: newOptions } }
+    }))
+    if (prevVote !== undefined) {
+      await supabase.from('poll_votes').delete().eq('poll_id', pollId).eq('user_id', currentUserId)
+    }
+    await supabase.from('poll_votes').insert({ poll_id: pollId, user_id: currentUserId, option_index: optionIndex })
+  }
+
+  async function loadPollData(postId: string) {
+    const { data: poll } = await supabase.from('polls').select('*').eq('post_id', postId).single()
+    if (!poll) return
+    const { data: votes } = await supabase.from('poll_votes').select('*').eq('poll_id', poll.id)
+    const { data: myVote } = await supabase.from('poll_votes').select('option_index').eq('poll_id', poll.id).eq('user_id', currentUserId).single()
+    // Count votes per option
+    const counts: number[] = poll.options.map((_: any) => 0)
+    ;(votes || []).forEach((v: any) => { if (counts[v.option_index] !== undefined) counts[v.option_index]++ })
+    const optionsWithVotes = poll.options.map((o: any, i: number) => ({ ...o, votes: counts[i] }))
+    if (myVote) setPollVotes(prev => ({ ...prev, [poll.id]: myVote.option_index }))
+    setPosts((prev: any[]) => prev.map(p => p.id === postId ? { ...p, _poll: { ...poll, options: optionsWithVotes } } : p))
   }
 
   const name = profile?.name || 'You'
@@ -238,6 +290,16 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
               {post.content && <div style={{ padding: '10px 14px', fontSize: '14px', color: 'var(--text2)', lineHeight: '1.65', whiteSpace: 'pre-wrap' }}>{post.content}</div>}
               {post.media_url && <img src={post.media_url} alt="" style={{ width: '100%', maxHeight: '500px', objectFit: 'cover', display: 'block' }} />}
 
+              {/* Poll */}
+              {post.type === 'poll' && (
+                <PollBlock
+                  post={post}
+                  pollVotes={pollVotes}
+                  onLoad={() => loadPollData(post.id)}
+                  onVote={(pollId: string, optIdx: number, opts: any[]) => votePoll(pollId, post.id, optIdx, opts)}
+                />
+              )}
+
               {/* Actions */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '7px 10px', borderTop: '1px solid var(--border)' }}>
                 <button onClick={() => toggleLike(post.id)} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 10px', borderRadius: '8px', border: 'none', background: 'none', color: isLiked ? 'var(--red)' : 'var(--text3)', fontSize: '13px', fontWeight: '500', cursor: 'pointer', transition: 'all .18s' }}>
@@ -312,7 +374,37 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
                 </select>
               </div>
             </div>
-            <textarea value={postForm.content} onChange={e => setPostForm(prev => ({ ...prev, content: e.target.value }))} placeholder="What's on your mind?" rows={4} autoFocus style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px', color: 'var(--text1)', fontSize: '14px', outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: '1.6', marginBottom: '10px' }} />
+            {/* Post type toggle */}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
+              {(['post', 'poll'] as const).map(t => (
+                <button key={t} onClick={() => setPostType(t)} style={{ padding: '6px 14px', borderRadius: '20px', border: `1px solid ${postType === t ? 'var(--accent)' : 'var(--border)'}`, background: postType === t ? 'var(--accent)' : 'var(--bg3)', color: postType === t ? '#fff' : 'var(--text2)', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+                  {t === 'post' ? '📝 Post' : '📊 Poll'}
+                </button>
+              ))}
+            </div>
+
+            <textarea value={postForm.content} onChange={e => setPostForm(prev => ({ ...prev, content: e.target.value }))} placeholder={postType === 'poll' ? 'Context for your poll (optional)…' : "What's on your mind?"} rows={3} autoFocus style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px', color: 'var(--text1)', fontSize: '14px', outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: '1.6', marginBottom: '10px' }} />
+
+            {/* Poll builder */}
+            {postType === 'poll' && (
+              <div style={{ marginBottom: '12px' }}>
+                <input value={pollQuestion} onChange={e => setPollQuestion(e.target.value)} placeholder="Ask a question…" style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--accentbdr, rgba(99,102,241,.28))', borderRadius: '9px', padding: '9px 13px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit', marginBottom: '8px' }} />
+                {pollOptions.map((opt, i) => (
+                  <div key={i} style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                    <input value={opt} onChange={e => setPollOptions(prev => prev.map((o, j) => j === i ? e.target.value : o))} placeholder={`Option ${i + 1}`} style={{ flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
+                    {pollOptions.length > 2 && (
+                      <button onClick={() => setPollOptions(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: '16px', padding: '0 4px' }}>×</button>
+                    )}
+                  </div>
+                ))}
+                {pollOptions.length < 4 && (
+                  <button onClick={() => setPollOptions(prev => [...prev, ''])} style={{ padding: '6px 13px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text2)', fontSize: '12px', cursor: 'pointer' }}>+ Add option</button>
+                )}
+              </div>
+            )}
+
+            {/* Image upload (only for regular posts) */}
+            {postType === 'post' && (<>
             {imagePreview && (
               <div style={{ position: 'relative', marginBottom: '10px', borderRadius: '10px', overflow: 'hidden' }}>
                 <img src={imagePreview} alt="Preview" style={{ width: '100%', maxHeight: '260px', objectFit: 'cover', display: 'block' }} />
@@ -323,6 +415,7 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} style={{ display: 'none' }} />
               <button onClick={() => fileInputRef.current?.click()} style={{ padding: '7px 14px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text2)', fontSize: '12px', cursor: 'pointer' }}>📷 Add photo</button>
             </div>
+            </>)}
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={() => setCreating(false)} style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '9px', color: 'var(--text2)', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
               <button onClick={createPost} disabled={!postForm.content.trim() || !postForm.room_id || posting} style={{ flex: 2, padding: '10px', background: 'var(--accent)', border: 'none', borderRadius: '9px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '600', opacity: !postForm.content.trim() || posting ? .6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
@@ -332,6 +425,45 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function PollBlock({ post, pollVotes, onLoad, onVote }: any) {
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    if (!loaded) { onLoad(); setLoaded(true) }
+  }, [])
+
+  const poll = post._poll
+  if (!poll) return <div style={{ padding: '14px', color: 'var(--text3)', fontSize: '13px' }}>Loading poll…</div>
+
+  const totalVotes = poll.options.reduce((a: number, o: any) => a + (o.votes || 0), 0)
+  const myVote = pollVotes[poll.id]
+  const hasVoted = myVote !== undefined
+
+  return (
+    <div style={{ padding: '12px 14px' }}>
+      <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text1)', marginBottom: '10px' }}>📊 {poll.question}</div>
+      {poll.options.map((opt: any, i: number) => {
+        const pct = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0
+        const chosen = myVote === i
+        return (
+          <div key={i} onClick={() => !hasVoted && onVote(poll.id, i, poll.options)} style={{ marginBottom: '7px', cursor: hasVoted ? 'default' : 'pointer' }}>
+            <div style={{ padding: '9px 13px', borderRadius: '9px', position: 'relative', overflow: 'hidden', border: `1px solid ${chosen ? 'rgba(99,102,241,.4)' : 'var(--border)'}`, background: chosen ? 'rgba(99,102,241,.08)' : 'var(--bg3)', transition: 'all .18s' }}>
+              {hasVoted && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: 'rgba(99,102,241,.1)', transition: 'width .6s ease' }} />}
+              <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', color: chosen ? 'var(--accent2)' : 'var(--text1)', fontWeight: chosen ? '600' : '400' }}>{opt.text}</span>
+                {hasVoted && <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--accent2)' }}>{pct}%</span>}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+      <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>
+        {totalVotes} vote{totalVotes !== 1 ? 's' : ''} · {hasVoted ? 'You voted' : 'Tap to vote'}
+      </div>
     </div>
   )
 }
