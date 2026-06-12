@@ -1,10 +1,10 @@
-import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { redirect } from 'next/navigation'
+import FeedClient from './FeedClient'
 
 export default async function FeedPage() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
-
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase
@@ -13,25 +13,34 @@ export default async function FeedPage() {
     .eq('id', user.id)
     .single()
 
+  // Get posts from all rooms, newest first
+  const { data: posts } = await supabase
+    .from('posts')
+    .select('*, profiles(name, username), rooms(name, emoji, category)')
+    .order('created_at', { ascending: false })
+    .limit(30)
+
+  // Get which posts current user liked
+  const { data: likes } = await supabase
+    .from('likes')
+    .select('post_id')
+    .eq('user_id', user.id)
+
+  const likedIds = new Set((likes || []).map((l: any) => l.post_id))
+
+  // Get rooms for create post dropdown
+  const { data: rooms } = await supabase
+    .from('rooms')
+    .select('id, name, emoji')
+    .order('name')
+
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'var(--bg0)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }}>
-      <div style={{ textAlign: 'center' }} className="fade-up">
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🚀</div>
-        <div style={{
-          fontWeight: '800', fontSize: '24px', marginBottom: '8px'
-        }}>
-          Welcome, {profile?.name || user.email}!
-        </div>
-        <div style={{ color: 'var(--text3)', fontSize: '14px' }}>
-          You are logged in. Feed coming next.
-        </div>
-      </div>
-    </div>
+    <FeedClient
+      posts={posts || []}
+      likedIds={[...likedIds]}
+      profile={profile}
+      rooms={rooms || []}
+      currentUserId={user.id}
+    />
   )
 }
