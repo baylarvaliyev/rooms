@@ -1,3 +1,5 @@
+// Daily.co Voice/Video Room API
+// Version: 1.1
 import { NextRequest, NextResponse } from 'next/server'
 
 const DAILY_API = 'https://api.daily.co/v1'
