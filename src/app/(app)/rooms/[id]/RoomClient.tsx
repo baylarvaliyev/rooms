@@ -46,6 +46,22 @@ export default function RoomClient({ room, initialMessages, members: initialMemb
   const isOwner = room.created_by === currentUser.id
   const myMembership = members.find((m: any) => m.user_id === currentUser.id)
   const isMod = isOwner || myMembership?.is_moderator
+  const [isFollowing, setIsFollowing] = useState(false)
+
+  useEffect(() => {
+    // Check if user follows this room
+    supabase.from('room_follows').select('id').eq('room_id', room.id).eq('user_id', currentUser.id).single()
+      .then(({ data }) => setIsFollowing(!!data))
+  }, [])
+
+  async function toggleFollow() {
+    if (isFollowing) {
+      await supabase.from('room_follows').delete().eq('room_id', room.id).eq('user_id', currentUser.id)
+    } else {
+      await supabase.from('room_follows').insert({ room_id: room.id, user_id: currentUser.id })
+    }
+    setIsFollowing(!isFollowing)
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -160,6 +176,10 @@ export default function RoomClient({ room, initialMessages, members: initialMemb
             </div>
           </div>
           <div style={{ display: 'flex', gap: '4px' }}>
+            {/* Follow button — for non-members or members who want notifications */}
+            <button onClick={toggleFollow} style={{ padding: '5px 12px', borderRadius: '20px', border: `1px solid ${isFollowing ? 'var(--border)' : 'var(--accent)'}`, background: isFollowing ? 'var(--bg3)' : 'rgba(225,48,108,.1)', color: isFollowing ? 'var(--text3)' : 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', transition: 'all .18s', flexShrink: 0, fontFamily: 'inherit' }}>
+              {isFollowing ? '🔔 Following' : '🔔 Follow'}
+            </button>
             <button onClick={() => setShowMembers(s => !s)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: showMembers ? 'var(--text1)' : 'var(--text3)', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
             </button>
