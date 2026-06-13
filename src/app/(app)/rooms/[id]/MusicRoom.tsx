@@ -172,8 +172,11 @@ export default function MusicRoom({ room, members, currentUser, isMember }: any)
   }
 
   async function removeTrack(id: string, i: number) {
+    setTracks(prev => prev.filter(t => t.id !== id))
     await supabase.from('room_tracks').delete().eq('id', id)
-    if (i === state.current_index && tracks.length > 1) await upsertState({ current_index: 0, is_playing: false })
+    if (i === state.current_index && tracks.length > 1) {
+      await upsertState({ current_index: 0, is_playing: false })
+    }
   }
 
   async function sendChat() {
@@ -245,46 +248,54 @@ export default function MusicRoom({ room, members, currentUser, isMember }: any)
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* Player */}
-        <div style={{ background: 'linear-gradient(135deg, #1a0a2e, #0a1a2e)', padding: '16px', flexShrink: 0 }}>
+        <div style={{ background: 'linear-gradient(135deg, #1a0a2e, #0a1a2e)', padding: '12px 16px', flexShrink: 0 }}>
           {currentTrack ? (
             <>
-              {/* YouTube embed */}
+              {/* YouTube embed — capped height on desktop */}
               {currentTrack.type === 'youtube' && (() => {
                 const src = buildEmbedSrc(currentTrack.url, state.is_playing)
                 return src ? (
-                  <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: '10px', overflow: 'hidden', marginBottom: '14px' }}>
-                    <iframe src={src} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allow="autoplay; encrypted-media" allowFullScreen key={`${currentTrack.id}-${state.current_index}`} />
+                  <div style={{ maxWidth: '480px', margin: '0 auto', marginBottom: '12px' }}>
+                    <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: '10px', overflow: 'hidden' }}>
+                      <iframe src={src} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allow="autoplay; encrypted-media" allowFullScreen key={`${currentTrack.id}-${state.current_index}`} />
+                    </div>
                   </div>
                 ) : null
               })()}
 
               {/* Upload track display */}
               {currentTrack.type === 'upload' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', maxWidth: '480px', margin: '0 auto 12px' }}>
                   <audio ref={audioRef} onEnded={nextTrack} style={{ display: 'none' }} />
-                  <div style={{ width: '56px', height: '56px', borderRadius: '10px', background: 'linear-gradient(135deg, #2a1a4e, #4a2a7e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>🎵</div>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: 'linear-gradient(135deg, #2a1a4e, #4a2a7e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>🎵</div>
                   <div>
-                    <div style={{ fontWeight: '700', fontSize: '15px', color: '#fff', marginBottom: '3px' }}>{currentTrack.title}</div>
-                    <div style={{ fontSize: '12px', color: 'rgba(255,255,255,.5)' }}>Added by {currentTrack.profiles?.name}</div>
+                    <div style={{ fontWeight: '600', fontSize: '14px', color: '#fff' }}>{currentTrack.title}</div>
+                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,.5)' }}>Added by {currentTrack.profiles?.name}</div>
                   </div>
                 </div>
               )}
 
-              {/* Controls */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
-                <button onClick={prevTrack} disabled={!isOwner || tracks.length < 2} style={{ background: 'none', border: 'none', cursor: isOwner && tracks.length > 1 ? 'pointer' : 'default', fontSize: '22px', color: isOwner && tracks.length > 1 ? 'rgba(255,255,255,.7)' : 'rgba(255,255,255,.2)', padding: '4px' }}>⏮</button>
-                <button onClick={playPause} disabled={!isOwner} style={{ width: '48px', height: '48px', borderRadius: '50%', background: isOwner ? '#fff' : 'rgba(255,255,255,.25)', border: 'none', cursor: isOwner ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
-                  {state.is_playing ? '⏸' : '▶️'}
-                </button>
-                <button onClick={nextTrack} disabled={!isOwner || tracks.length < 2} style={{ background: 'none', border: 'none', cursor: isOwner && tracks.length > 1 ? 'pointer' : 'default', fontSize: '22px', color: isOwner && tracks.length > 1 ? 'rgba(255,255,255,.7)' : 'rgba(255,255,255,.2)', padding: '4px' }}>⏭</button>
-              </div>
-              {!isOwner && <div style={{ textAlign: 'center', fontSize: '11px', color: 'rgba(255,255,255,.35)', marginTop: '8px' }}>Only the host can control playback</div>}
+              {/* Controls — owner only */}
+              {isOwner && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+                  <button onClick={prevTrack} disabled={tracks.length < 2} style={{ background: 'none', border: 'none', cursor: tracks.length > 1 ? 'pointer' : 'default', fontSize: '20px', color: tracks.length > 1 ? 'rgba(255,255,255,.7)' : 'rgba(255,255,255,.2)', padding: '4px' }}>⏮</button>
+                  <button onClick={playPause} style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+                    {state.is_playing ? '⏸' : '▶️'}
+                  </button>
+                  <button onClick={nextTrack} disabled={tracks.length < 2} style={{ background: 'none', border: 'none', cursor: tracks.length > 1 ? 'pointer' : 'default', fontSize: '20px', color: tracks.length > 1 ? 'rgba(255,255,255,.7)' : 'rgba(255,255,255,.2)', padding: '4px' }}>⏭</button>
+                </div>
+              )}
+              {!isOwner && (
+                <div style={{ textAlign: 'center', fontSize: '11px', color: 'rgba(255,255,255,.35)' }}>
+                  {state.is_playing ? '▶ Playing' : '⏸ Paused'} · host controls playback
+                </div>
+              )}
             </>
           ) : (
-            <div style={{ textAlign: 'center', padding: '30px 0' }}>
-              <div style={{ fontSize: '36px', marginBottom: '10px' }}>🎵</div>
+            <div style={{ textAlign: 'center', padding: '24px 0' }}>
+              <div style={{ fontSize: '32px', marginBottom: '8px' }}>🎵</div>
               <div style={{ fontSize: '13px', color: 'rgba(255,255,255,.4)', marginBottom: '12px' }}>No tracks yet</div>
-              {joined && <button onClick={() => setShowAdd(true)} style={{ padding: '8px 18px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', cursor: 'pointer' }}>+ Add first track</button>}
+              {joined && <button onClick={() => setShowAdd(true)} style={{ padding: '7px 16px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', cursor: 'pointer' }}>+ Add first track</button>}
             </div>
           )}
         </div>
@@ -315,7 +326,7 @@ export default function MusicRoom({ room, members, currentUser, isMember }: any)
                     {[1, 2, 3].map(n => <div key={n} style={{ width: '3px', background: 'var(--accent2)', borderRadius: '2px', animation: `waveBar .7s ${n * .1}s infinite` }} />)}
                   </div>
                 )}
-                {t.added_by === currentUser.id && i !== state.current_index && (
+                {(isOwner || t.added_by === currentUser.id) && i !== state.current_index && (
                   <button onClick={e => { e.stopPropagation(); removeTrack(t.id, i) }} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '18px', padding: '4px', lineHeight: 1 }}
                     onMouseOver={e => (e.currentTarget as HTMLElement).style.color = 'var(--red)'}
                     onMouseOut={e => (e.currentTarget as HTMLElement).style.color = 'var(--text3)'}
