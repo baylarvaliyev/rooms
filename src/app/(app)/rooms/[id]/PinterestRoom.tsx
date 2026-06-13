@@ -34,12 +34,14 @@ export default function PinterestRoom({ room, currentUser, isMember }: any) {
   useEffect(() => {
     loadPins()
 
-    // Real-time new pins
+    // Real-time new pins (from OTHER users only — we add our own locally)
     const channel = supabase.channel(`pins:${room.id}`)
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'room_pins',
         filter: `room_id=eq.${room.id}`
       }, async (payload) => {
+        // Skip if it's our own pin (already added locally)
+        if (payload.new.user_id === currentUser.id) return
         const { data } = await supabase
           .from('room_pins')
           .select('*, profiles(name, username)')
@@ -94,12 +96,16 @@ export default function PinterestRoom({ room, currentUser, isMember }: any) {
       .upload(path, file, { cacheControl: '3600', upsert: false })
     if (error) { alert('Upload failed'); setUploading(false); return }
     const { data: urlData } = supabase.storage.from('posts').getPublicUrl(path)
-    await supabase.from('room_pins').insert({
+    const { data: newPin } = await supabase.from('room_pins').insert({
       room_id: room.id,
       user_id: currentUser.id,
       image_url: urlData.publicUrl,
       caption: caption.trim()
-    })
+    }).select('*, profiles(name, username)').single()
+
+    // Add to local state immediately — don't wait for realtime
+    if (newPin) setPins(prev => [newPin, ...prev])
+
     setFile(null)
     setPreview(null)
     setCaption('')
@@ -206,7 +212,7 @@ export default function PinterestRoom({ room, currentUser, isMember }: any) {
 
         {/* Masonry grid */}
         {!loading && pins.length > 0 && (
-          <div style={{ columns: '2', columnGap: '10px' }}>
+          <div style={{ columns: '3', columnGap: '10px' }}>
             {pins.map(pin => (
               <div key={pin.id} style={{ breakInside: 'avoid', marginBottom: '10px', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border)', position: 'relative', cursor: 'pointer', display: 'block', background: 'var(--bg2)' }}
                 onMouseOver={e => {
@@ -218,7 +224,7 @@ export default function PinterestRoom({ room, currentUser, isMember }: any) {
                   if (overlay) overlay.style.opacity = '0'
                 }}
               >
-                <img src={pin.image_url} alt={pin.caption || 'Pin'} style={{ width: '100%', display: 'block', objectFit: 'cover' }} loading="lazy" />
+                <img src={pin.image_url} alt={pin.caption || 'Pin'} style={{ width: '100%', maxHeight: '320px', display: 'block', objectFit: 'cover' }} loading="lazy" />
 
                 {/* Overlay */}
                 <div className="pin-overlay" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.75) 0%, transparent 50%)', opacity: 0, transition: 'opacity .2s', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '10px' }}>
