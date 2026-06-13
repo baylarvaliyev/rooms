@@ -21,9 +21,9 @@ const SAMPLE_DEBATE = {
 }
 
 const SAMPLE_TAKES = [
-  { id: 1, user: "Alex R.", text: "The question isn't if but when. GPT-4 already does 80% of what junior analysts do. Companies are already quietly not replacing people who leave.", up: 234, down: 45, voted: null },
-  { id: 2, user: "Sarah V.", text: "Every wave of automation created more jobs than it destroyed. The industrial revolution, computing, internet. AI will be the same.", up: 189, down: 67, voted: null },
-  { id: 3, user: "Omar H.", text: "The difference this time is speed. Previous transitions took generations. AI capabilities are doubling every few months.", up: 156, down: 23, voted: null },
+  { id: 1, user: "Alex R.", text: "The question isn't if but when. GPT-4 already does 80% of what junior analysts do. Companies are already quietly not replacing people who leave.", up: 234, down: 45, voted: null as string | null },
+  { id: 2, user: "Sarah V.", text: "Every wave of automation created more jobs than it destroyed. The industrial revolution, computing, internet. AI will be the same.", up: 189, down: 67, voted: null as string | null },
+  { id: 3, user: "Omar H.", text: "The difference this time is speed. Previous transitions took generations. AI capabilities are doubling every few months.", up: 156, down: 23, voted: null as string | null },
 ]
 
 export default function DebateRoom({ room, currentUser, isMember }: any) {

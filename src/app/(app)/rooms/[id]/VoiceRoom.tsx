@@ -161,7 +161,7 @@ export default function VoiceRoom({ room, members, currentUser, isMember }: any)
           <button
             onClick={() => setMuted(!muted)}
             style={{
-              width: '52px', height: '52px', borderRadius: '50%', border: 'none',
+              width: '52px', height: '52px', borderRadius: '50%',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '22px', transition: 'all .2s',
               background: muted ? 'rgba(239,68,68,.15)' : 'var(--bg3)',
