@@ -63,9 +63,29 @@ export default function RoomClient({ room, initialMessages, members: initialMemb
     setIsFollowing(!isFollowing)
   }
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  const [inviteCode, setInviteCode] = useState('')
+  const [generatingInvite, setGeneratingInvite] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  async function generateInvite() {
+    setGeneratingInvite(true)
+    // Check if invite already exists
+    const { data: existing } = await supabase.from('room_invites').select('code').eq('room_id', room.id).eq('created_by', currentUser.id).single()
+    if (existing) {
+      setInviteCode(existing.code)
+    } else {
+      const { data } = await supabase.from('room_invites').insert({ room_id: room.id, created_by: currentUser.id }).select('code').single()
+      if (data) setInviteCode(data.code)
+    }
+    setGeneratingInvite(false)
+  }
+
+  async function copyInvite() {
+    const url = `${window.location.origin}/invite/${inviteCode}`
+    await navigator.clipboard.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   useEffect(() => {
     loadPinnedMessage()
@@ -183,7 +203,7 @@ export default function RoomClient({ room, initialMessages, members: initialMemb
             <button onClick={() => setShowMembers(s => !s)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: showMembers ? 'var(--text1)' : 'var(--text3)', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
             </button>
-            {isMod && (
+            {joined && (
               <button onClick={() => setShowSettings(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
               </button>
@@ -334,6 +354,25 @@ export default function RoomClient({ room, initialMessages, members: initialMemb
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <div style={{ fontWeight: '700', fontSize: '16px' }}>⚙️ Room Settings</div>
               <button onClick={() => setShowSettings(false)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '20px' }}>×</button>
+            </div>
+
+            {/* Invite link — all members can generate */}
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '8px' }}>🔗 Invite Link</div>
+              {inviteCode ? (
+                <div>
+                  <div style={{ background: 'var(--bg3)', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: 'var(--text3)', marginBottom: '8px', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                    {window.location.origin}/invite/{inviteCode}
+                  </div>
+                  <button onClick={copyInvite} style={{ width: '100%', padding: '9px', background: copied ? 'rgba(34,197,94,.15)' : 'var(--accent)', border: `1px solid ${copied ? 'rgba(34,197,94,.3)' : 'none'}`, borderRadius: '8px', color: copied ? 'var(--green)' : '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {copied ? '✓ Copied!' : 'Copy Link'}
+                  </button>
+                </div>
+              ) : (
+                <button onClick={generateInvite} disabled={generatingInvite} style={{ width: '100%', padding: '9px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text2)', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  {generatingInvite ? <><div className="spinner" />Generating…</> : '🔗 Generate Invite Link'}
+                </button>
+              )}
             </div>
 
             {/* Pin a message */}
