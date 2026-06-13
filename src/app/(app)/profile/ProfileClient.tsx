@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
@@ -54,7 +54,14 @@ function getLevel(rep: number) {
   return { level: 1, title: 'Newcomer', next: 20 }
 }
 
-export default function ProfileClient({ profile, posts, rooms, followersCount, followingCount, achievements }: any) {
+export default function ProfileClient({ profile: initialProfile, posts: initialPosts, rooms: initialRooms, followersCount: initialFollowers, followingCount: initialFollowing, achievements: initialAchievements }: any) {
+  const [profile, setProfile] = useState(initialProfile || null)
+  const [posts, setPosts] = useState(initialPosts || [])
+  const [rooms, setRooms] = useState(initialRooms || [])
+  const [followersCount, setFollowersCount] = useState(initialFollowers || 0)
+  const [followingCount, setFollowingCount] = useState(initialFollowing || 0)
+  const [achievements, setAchievements] = useState(initialAchievements || [])
+  const [dataLoading, setDataLoading] = useState(!initialProfile)
   const [tab, setTab] = useState<'posts' | 'rooms' | 'achievements'>('posts')
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(profile?.name || '')
@@ -72,11 +79,67 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
   const router = useRouter()
   const supabase = createClient()
 
+  useEffect(() => {
+    if (!initialProfile) loadProfile()
+  }, [])
+
+  async function loadProfile() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const [
+      { data: profileData },
+      { data: postsData },
+      { data: roomsData },
+      { count: followers },
+      { count: following },
+      { data: achievementsData },
+    ] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', user.id).single(),
+      supabase.from('posts').select('*, rooms(name, emoji)').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('room_members').select('*, rooms(id, name, emoji, category, member_count)').eq('user_id', user.id),
+      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id),
+      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id),
+      supabase.from('achievements').select('*').eq('user_id', user.id),
+    ])
+    if (profileData) {
+      setProfile(profileData)
+      setName(profileData.name || '')
+      setBio(profileData.bio || '')
+      setTwitter(profileData.social_links?.twitter || '')
+      setLinkedin(profileData.social_links?.linkedin || '')
+      setWebsite(profileData.social_links?.website || '')
+      setAvatarUrl(profileData.avatar_url || '')
+      setCoverUrl(profileData.cover_url || '')
+    }
+    setPosts(postsData || [])
+    setRooms(roomsData || [])
+    setFollowersCount(followers || 0)
+    setFollowingCount(following || 0)
+    setAchievements(achievementsData || [])
+    setDataLoading(false)
+  }
+
   const color = getColor(profile?.name || 'U')
   const rep = profile?.reputation || 0
   const { level, title, next } = getLevel(rep)
   const progress = next ? Math.min(100, (rep / next) * 100) : 100
   const earnedTypes = new Set((achievements || []).map((a: any) => a.type))
+
+  if (dataLoading) {
+    return (
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+        <div style={{ maxWidth: '700px', margin: '0 auto' }}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden', marginBottom: '16px', animation: 'pulse 1.5s infinite' }}>
+            <div style={{ height: '160px', background: 'var(--bg4)' }} />
+            <div style={{ padding: '50px 20px 20px' }}>
+              <div style={{ height: '18px', background: 'var(--bg4)', borderRadius: '6px', width: '30%', marginBottom: '8px' }} />
+              <div style={{ height: '12px', background: 'var(--bg4)', borderRadius: '6px', width: '20%' }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
