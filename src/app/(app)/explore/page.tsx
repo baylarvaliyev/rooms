@@ -2,6 +2,8 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import ExploreClient from './ExploreClient'
 
+export const revalidate = 60 // cache explore for 60 seconds
+
 export default async function ExplorePage() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
