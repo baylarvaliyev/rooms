@@ -20,7 +20,7 @@ async function dailyFetch(path: string, method = 'GET', body?: any) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { action, roomName, isOwner } = await req.json()
+    const { action, roomName, isOwner, userName } = await req.json()
 
     if (action === 'get-or-create-room') {
       // Daily room names: only lowercase letters, numbers, hyphens, max 255 chars
@@ -57,9 +57,12 @@ export async function POST(req: NextRequest) {
         properties: {
           room_name: safeName,
           is_owner: isOwner,
+          user_name: userName || 'Guest',
           start_audio_off: !isOwner,
           enable_recording: false,
           exp: Math.floor(Date.now() / 1000) + 60 * 60 * 4,
+          close_tab_on_exit: false,
+          redirect_on_meeting_exit: false,
         }
       })
 

@@ -19,13 +19,18 @@ export default function VoiceRoom({ room, members, currentUser, isMember }: any)
   const [muted, setMuted] = useState(true)
   const [handRaised, setHandRaised] = useState(false)
   const [isOwner] = useState(room.created_by === currentUser.id)
+  const [isMobile, setIsMobile] = useState(false)
+  const [dailyUrl, setDailyUrl] = useState('')
+  const [dailyToken, setDailyToken] = useState('')
   const callRef = useRef<any>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
   const router = useRouter()
 
-  // Cleanup on unmount
   useEffect(() => {
+    // Detect mobile
+    const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    setIsMobile(mobile)
+
     return () => {
       if (callRef.current) {
         callRef.current.destroy()
@@ -39,34 +44,44 @@ export default function VoiceRoom({ room, members, currentUser, isMember }: any)
     setJoined(true)
   }
 
+  async function getCredentials() {
+    const roomName = `room-${room.id.replace(/-/g, '').slice(0, 40)}`
+    const userName = currentUser?.user_metadata?.full_name ||
+      currentUser?.user_metadata?.name ||
+      currentUser?.email?.split('@')[0] || 'Guest'
+    const res = await fetch('/api/daily', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get-or-create-room', roomName, isOwner, userName })
+    })
+    const json = await res.json()
+    if (!res.ok || json.error) throw new Error(json.error || 'Failed to connect')
+    return json
+  }
+
   async function joinCall() {
     setLoading(true)
     setError('')
     try {
-      // Safe room name — Daily requires lowercase letters, numbers, hyphens only
-      const roomName = `room-${room.id.replace(/-/g, '').slice(0, 40)}`
-      const res = await fetch('/api/daily', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get-or-create-room', roomName, isOwner })
-      })
-      const json = await res.json()
-      if (!res.ok || json.error) {
-        setError(json.error || 'Failed to connect. Try again.')
+      const { url, token } = await getCredentials()
+
+      if (isMobile) {
+        // Mobile: use iframe embed (avoids SDK auth issues on Safari)
+        setDailyUrl(url)
+        setDailyToken(token)
+        setCallJoined(true)
         setLoading(false)
         return
       }
-      const { url, token } = json
 
-      // Dynamically import Daily to avoid SSR issues
+      // Desktop: use call object for better control
       const DailyIframe = (await import('@daily-co/daily-js')).default
       const call = DailyIframe.createCallObject({
         audioSource: true,
-        videoSource: false, // Voice only
+        videoSource: false,
       })
       callRef.current = call
 
-      // Event listeners
       call.on('joined-meeting', () => {
         setCallJoined(true)
         setLoading(false)
@@ -77,13 +92,7 @@ export default function VoiceRoom({ room, members, currentUser, isMember }: any)
       call.on('participant-left', () => updateParticipants(call))
       call.on('error', (e: any) => {
         console.error('Daily error:', e)
-        if (e?.errorMsg?.includes('authentication') || e?.errorMsg?.includes('token')) {
-          setError('Authentication failed. Please try leaving and rejoining.')
-        } else if (e?.errorMsg?.includes('payment')) {
-          setError('Service configuration error. Please contact support.')
-        } else {
-          setError(`Connection error: ${e?.errorMsg || 'Unknown error'}. Please try again.`)
-        }
+        setError(`Connection error: ${e?.errorMsg || 'Unknown'}. Try again.`)
         setLoading(false)
       })
       call.on('left-meeting', () => {
@@ -91,19 +100,17 @@ export default function VoiceRoom({ room, members, currentUser, isMember }: any)
         setParticipants([])
       })
 
-      // Join the call
       await call.join({ url, token, startAudioOff: !isOwner })
       setMuted(!isOwner)
 
-    } catch (e) {
-      setError('Failed to join. Check your microphone permissions.')
+    } catch (e: any) {
+      setError(e.message || 'Failed to join. Check microphone permissions.')
       setLoading(false)
     }
   }
 
   function updateParticipants(call: any) {
-    const ps = call.participants()
-    setParticipants(Object.values(ps))
+    setParticipants(Object.values(call.participants()))
   }
 
   async function toggleMute() {
@@ -122,9 +129,9 @@ export default function VoiceRoom({ room, members, currentUser, isMember }: any)
     setCallJoined(false)
     setParticipants([])
     setHandRaised(false)
+    setDailyUrl('')
+    setDailyToken('')
   }
-
-  const speakingCount = participants.filter((p: any) => !p.audio?.blocked && p.tracks?.audio?.state === 'playable').length
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -144,92 +151,107 @@ export default function VoiceRoom({ room, members, currentUser, isMember }: any)
         {isOwner && <div style={{ padding: '4px 10px', background: 'rgba(99,102,241,.15)', border: '1px solid var(--accentbdr)', borderRadius: '6px', fontSize: '11px', color: 'var(--accent2)' }}>👑 Host</div>}
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px' }}>
-
-        {/* Error */}
-        {error && (
-          <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px', fontSize: '13px', color: 'var(--red)' }}>
-            {error}
+      {/* Mobile iframe embed */}
+      {callJoined && isMobile && dailyUrl && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <iframe
+            src={`${dailyUrl}?t=${dailyToken}`}
+            allow="camera; microphone; autoplay; display-capture; fullscreen"
+            style={{ flex: 1, border: 'none', width: '100%' }}
+          />
+          <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg1)', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <button onClick={leaveCall} style={{ padding: '10px 24px', background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.3)', borderRadius: '24px', color: 'var(--red)', cursor: 'pointer', fontSize: '14px', fontWeight: '600', fontFamily: 'inherit' }}>
+              📴 Leave
+            </button>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Not in call yet */}
-        {!callJoined ? (
+      {/* Desktop call view */}
+      {callJoined && !isMobile && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px' }}>
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '12px' }}>
+              {participants.length} in call
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '12px' }}>
+              {participants.map((p: any) => {
+                const name = p.user_name || 'Guest'
+                const isSpeaking = p.tracks?.audio?.state === 'playable'
+                return (
+                  <div key={p.session_id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '14px 10px', background: 'var(--bg2)', border: `1px solid ${isSpeaking ? 'rgba(34,197,94,.4)' : 'var(--border)'}`, borderRadius: '12px', boxShadow: isSpeaking ? '0 0 12px rgba(34,197,94,.15)' : 'none' }}>
+                    <div style={{ position: 'relative' }}>
+                      <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: getColor(name), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: '700', color: '#fff', border: `2px solid ${isSpeaking ? 'var(--green)' : 'transparent'}` }}>
+                        {name.charAt(0).toUpperCase()}
+                      </div>
+                      {isSpeaking && <div style={{ position: 'absolute', bottom: 0, right: 0, width: '14px', height: '14px', background: 'var(--green)', borderRadius: '50%', border: '2px solid var(--bg2)' }} />}
+                    </div>
+                    <div style={{ fontSize: '12px', fontWeight: '500', textAlign: 'center' }}>{p.local ? 'You' : name}</div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {!isOwner && (
+            <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '8px' }}>Raise hand to request mic from host</div>
+              <button onClick={() => setHandRaised(!handRaised)} style={{ padding: '7px 16px', background: handRaised ? 'rgba(234,179,8,.15)' : 'var(--bg3)', border: `1px solid ${handRaised ? 'rgba(234,179,8,.3)' : 'var(--border)'}`, borderRadius: '8px', color: handRaised ? 'var(--yellow)' : 'var(--text2)', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                {handRaised ? '✋ Hand raised' : '✋ Raise hand'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pre-join screen */}
+      {!callJoined && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px' }}>
+          {error && (
+            <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px', fontSize: '13px', color: 'var(--red)' }}>
+              {error}
+            </div>
+          )}
           <div style={{ textAlign: 'center', padding: '40px 20px' }}>
             <div style={{ fontSize: '56px', marginBottom: '16px' }}>🎙️</div>
             <div style={{ fontWeight: '700', fontSize: '20px', marginBottom: '8px' }}>{room.name}</div>
-            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '8px' }}>
-              {isOwner ? 'You are the host. You can control who speaks.' : 'Join muted. Raise hand to request mic access.'}
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '28px' }}>
-              {members.length} member{members.length !== 1 ? 's' : ''}
+            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '24px' }}>
+              {isOwner ? 'You are the host. You control who speaks.' : 'You will join muted. Raise hand to speak.'}
             </div>
             {!joined ? (
-              <button onClick={joinRoom} style={{ padding: '12px 32px', background: 'var(--accent)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '15px', fontWeight: '600', cursor: 'pointer', marginBottom: '12px', display: 'block', margin: '0 auto 12px' }}>Join Room</button>
+              <button onClick={joinRoom} style={{ padding: '12px 32px', background: 'var(--accent)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>Join Room</button>
             ) : (
               <button onClick={joinCall} disabled={loading} style={{ padding: '12px 32px', background: 'var(--accent)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '15px', fontWeight: '600', cursor: loading ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '10px', margin: '0 auto', opacity: loading ? .7 : 1 }}>
                 {loading ? <><div className="spinner" />Connecting…</> : '🎙️ Join Voice Room'}
               </button>
             )}
           </div>
-        ) : (
-          <>
-            {/* Participants grid */}
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '12px' }}>
-                {participants.length} in call
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '12px' }}>
-                {participants.map((p: any) => {
-                  const name = p.user_name || p.user_id?.slice(0, 8) || 'Guest'
-                  const isSpeaking = p.tracks?.audio?.state === 'playable' && !p.audio?.blocked
-                  const isLocal = p.local
-                  return (
-                    <div key={p.session_id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '14px 10px', background: 'var(--bg2)', border: `1px solid ${isSpeaking ? 'rgba(34,197,94,.4)' : 'var(--border)'}`, borderRadius: '12px', transition: 'border-color .2s', boxShadow: isSpeaking ? '0 0 12px rgba(34,197,94,.15)' : 'none' }}>
-                      <div style={{ position: 'relative' }}>
-                        <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: getColor(name), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: '700', color: '#fff', border: `2px solid ${isSpeaking ? 'var(--green)' : 'transparent'}`, transition: 'border-color .2s' }}>
-                          {name.charAt(0).toUpperCase()}
-                        </div>
-                        {isSpeaking && <div style={{ position: 'absolute', bottom: 0, right: 0, width: '14px', height: '14px', background: 'var(--green)', borderRadius: '50%', border: '2px solid var(--bg2)', animation: 'pulse 1.5s infinite' }} />}
-                      </div>
-                      <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text1)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px' }}>{isLocal ? 'You' : name}</div>
-                      {p.audio?.blocked === false ? null : <div style={{ fontSize: '10px', color: 'var(--text3)' }}>🔇</div>}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
 
-            {/* Host controls info */}
-            {isOwner && (
-              <div style={{ background: 'rgba(99,102,241,.08)', border: '1px solid var(--accentbdr)', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px', fontSize: '12px', color: 'var(--accent2)' }}>
-                👑 As host, you can manage participants from the Daily.co interface. Members join muted and can raise their hand.
+          {/* Members list */}
+          <div style={{ marginTop: '20px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '10px' }}>{members.length} members</div>
+            {members.slice(0, 12).map((m: any) => (
+              <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '9px', marginBottom: '2px' }}>
+                <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: getColor(m.profiles?.name || 'U'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '700', color: '#fff' }}>{(m.profiles?.name || 'U').charAt(0).toUpperCase()}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: '500' }}>{m.profiles?.name}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{m.role === 'owner' ? '👑 Host' : 'Member'}</div>
+                </div>
               </div>
-            )}
-            {!isOwner && (
-              <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px' }}>
-                <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '8px' }}>Raise your hand to request microphone access from the host</div>
-                <button onClick={() => setHandRaised(!handRaised)} style={{ padding: '7px 16px', background: handRaised ? 'rgba(234,179,8,.15)' : 'var(--bg3)', border: `1px solid ${handRaised ? 'rgba(234,179,8,.3)' : 'var(--border)'}`, borderRadius: '8px', color: handRaised ? 'var(--yellow)' : 'var(--text2)', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>
-                  {handRaised ? '✋ Hand raised' : '✋ Raise hand'}
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-      {/* Bottom controls — only when in call */}
-      {callJoined && (
+      {/* Bottom controls — desktop only */}
+      {callJoined && !isMobile && (
         <div style={{ padding: '14px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg1)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
-          <button onClick={toggleMute} style={{ width: '52px', height: '52px', borderRadius: '50%', background: muted ? 'rgba(239,68,68,.15)' : 'var(--bg3)', border: `1px solid ${muted ? 'rgba(239,68,68,.3)' : 'var(--border)'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', transition: 'all .2s' }}>
+          <button onClick={toggleMute} style={{ width: '52px', height: '52px', borderRadius: '50%', background: muted ? 'rgba(239,68,68,.15)' : 'var(--bg3)', border: `1px solid ${muted ? 'rgba(239,68,68,.3)' : 'var(--border)'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>
             {muted ? '🔇' : '🎙️'}
           </button>
           <button onClick={leaveCall} style={{ padding: '0 24px', height: '52px', borderRadius: '26px', background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.3)', color: 'var(--red)', cursor: 'pointer', fontSize: '14px', fontWeight: '600', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '8px' }}>
             📴 Leave
           </button>
-          <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'var(--bg3)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', color: 'var(--text3)' }}>
-            {participants.length}👤
-          </div>
         </div>
       )}
     </div>
