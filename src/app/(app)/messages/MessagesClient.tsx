@@ -71,21 +71,10 @@ export default function MessagesClient({ currentUser, allUsers }: any) {
   )
 
   return (
-    <>
-      <style>{`
-        .msg-shell { flex: 1; display: flex; overflow: hidden; }
-        .msg-sidebar { width: 280px; border-right: 1px solid var(--border); background: var(--bg1); display: flex; flex-direction: column; flex-shrink: 0; }
-        .msg-chat { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        @media (max-width: 768px) {
-          .msg-sidebar { width: 100%; border-right: none; }
-          .msg-sidebar.hidden-mobile { display: none !important; }
-          .msg-chat.hidden-mobile { display: none !important; }
-        }
-      `}</style>
-      <div className="msg-shell">
+    <div className="msg-shell">
 
-        {/* SIDEBAR */}
-        <div className={`msg-sidebar${view === 'chat' ? ' hidden-mobile' : ''}`}>
+      {/* SIDEBAR */}
+      <div className={`msg-sidebar${view === 'chat' ? ' hidden' : ''}`}>
           <div style={{ padding: '14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontWeight: '600', fontSize: '14px' }}>Messages</span>
             <button onClick={() => setShowSearch(!showSearch)} style={{ background: 'var(--accent)', border: 'none', borderRadius: '7px', color: '#fff', padding: '6px 12px', fontSize: '12px', cursor: 'pointer', fontWeight: '500' }}>+ New</button>
@@ -129,8 +118,8 @@ export default function MessagesClient({ currentUser, allUsers }: any) {
           </div>
         </div>
 
-        {/* CHAT */}
-        <div className={`msg-chat${view === 'list' ? ' hidden-mobile' : ''}`}>
+      {/* CHAT */}
+      <div className={`msg-chat${view === 'list' ? ' hidden' : ''}`}>
           {!activeUser ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px', color: 'var(--text3)' }}>
               <div style={{ fontSize: '40px' }}>💬</div>
@@ -179,6 +168,6 @@ export default function MessagesClient({ currentUser, allUsers }: any) {
           )}
         </div>
       </div>
-    </>
+    </div>
   )
 }

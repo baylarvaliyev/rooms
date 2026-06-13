@@ -41,3 +41,42 @@ html, body { height: 100%; background: var(--bg0); color: var(--text1); font-fam
 .fade-up { animation: fadeUp .32s ease both; }
 .live-dot { display:inline-block; width:7px; height:7px; background:var(--green); border-radius:50%; animation:pulse 2s infinite; }
 .spinner { width:18px; height:18px; border:2px solid rgba(255,255,255,.2); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; flex-shrink: 0; }
+
+/* App shell */
+.app-shell { display: flex; height: 100dvh; overflow: hidden; background: var(--bg0); }
+.app-sidebar { width: 70px; background: var(--bg1); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 12px 0 14px; gap: 2px; flex-shrink: 0; z-index: 50; }
+.app-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.app-topbar { height: 52px; flex-shrink: 0; background: rgba(11,13,18,.95); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 10px; z-index: 40; }
+.app-content { flex: 1; overflow: hidden; display: flex; }
+.app-mobile-nav { display: none; }
+
+/* Messages */
+.msg-shell { flex: 1; display: flex; overflow: hidden; }
+.msg-sidebar { width: 280px; border-right: 1px solid var(--border); background: var(--bg1); display: flex; flex-direction: column; flex-shrink: 0; }
+.msg-chat { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+@media (max-width: 768px) {
+  .app-sidebar { display: none !important; }
+
+  .app-mobile-nav {
+    display: flex !important;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 60px;
+    background: rgba(11,13,18,.98);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 4px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .app-content > * { padding-bottom: 74px; }
+
+  .msg-sidebar { width: 100%; border-right: none; }
+  .msg-sidebar.hidden { display: none !important; }
+  .msg-chat.hidden { display: none !important; }
+}
