@@ -76,7 +76,14 @@ export default function VoiceRoom({ room, members, currentUser, isMember }: any)
       call.on('participant-updated', () => updateParticipants(call))
       call.on('participant-left', () => updateParticipants(call))
       call.on('error', (e: any) => {
-        setError('Connection error. Please try again.')
+        console.error('Daily error:', e)
+        if (e?.errorMsg?.includes('authentication') || e?.errorMsg?.includes('token')) {
+          setError('Authentication failed. Please try leaving and rejoining.')
+        } else if (e?.errorMsg?.includes('payment')) {
+          setError('Service configuration error. Please contact support.')
+        } else {
+          setError(`Connection error: ${e?.errorMsg || 'Unknown error'}. Please try again.`)
+        }
         setLoading(false)
       })
       call.on('left-meeting', () => {
