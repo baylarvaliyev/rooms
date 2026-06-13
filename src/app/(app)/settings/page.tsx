@@ -183,6 +183,10 @@ export default function SettingsPage() {
           <span style={{ color: 'var(--text3)', fontSize: '12px' }}>·</span>
           <a href="/privacy" style={{ fontSize: '12px', color: 'var(--text3)', textDecoration: 'none' }}>Privacy Policy</a>
         </div>
+
+        <div style={{ textAlign: 'center', marginTop: '12px' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text3)' }}>Rooms v1.0 · Built with ❤️</span>
+        </div>
       </div>
     </div>
   )
