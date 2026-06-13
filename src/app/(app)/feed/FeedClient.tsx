@@ -310,127 +310,177 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
   }
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '22px' }}>
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+    <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg0)' }}>
+      <div style={{ maxWidth: '470px', margin: '0 auto' }}>
 
-        {/* Create post box */}
-        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '13px', padding: '14px', marginBottom: '18px' }}>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700', color: '#fff', flexShrink: 0 }}>
-              {name.charAt(0).toUpperCase()}
+        {/* Stories row — rooms you follow */}
+        <div style={{ display: 'flex', gap: '16px', padding: '14px 16px', overflowX: 'auto', borderBottom: '1px solid var(--border)' }}>
+          {/* Your story */}
+          <div onClick={() => setCreating(true)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer', flexShrink: 0 }}>
+            <div style={{ width: '58px', height: '58px', borderRadius: '50%', background: 'var(--bg3)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', position: 'relative' }}>
+              {profile?.avatar_url ? <img src={profile.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{name.charAt(0).toUpperCase()}</div>}
+              <div style={{ position: 'absolute', bottom: 0, right: 0, width: '20px', height: '20px', borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg0)', fontSize: '12px', fontWeight: '700', color: '#fff' }}>+</div>
             </div>
-            <div onClick={() => setCreating(true)} style={{ flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '20px', padding: '9px 16px', fontSize: '13px', color: 'var(--text3)', cursor: 'pointer' }}>
-              What&apos;s on your mind, {name.split(' ')[0]}?
-            </div>
-            <button onClick={() => setCreating(true)} style={{ padding: '8px 14px', background: 'var(--accent)', border: 'none', borderRadius: '9px', color: '#fff', fontSize: '12px', fontWeight: '600', cursor: 'pointer', flexShrink: 0 }}>Post</button>
+            <span style={{ fontSize: '11px', color: 'var(--text2)', maxWidth: '60px', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Your story</span>
           </div>
+          {/* Room stories */}
+          {rooms.slice(0, 8).map((r: any) => (
+            <div key={r.id} onClick={() => router.push(`/rooms/${r.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer', flexShrink: 0 }}>
+              <div style={{ padding: '2px', background: 'var(--ig-gradient)', borderRadius: '50%' }}>
+                <div style={{ padding: '2px', background: 'var(--bg0)', borderRadius: '50%' }}>
+                  <div style={{ width: '54px', height: '54px', borderRadius: '50%', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>{r.emoji}</div>
+                </div>
+              </div>
+              <span style={{ fontSize: '11px', color: 'var(--text2)', maxWidth: '60px', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+            </div>
+          ))}
         </div>
 
         {/* New user banner */}
         {isNewUser && posts.length > 0 && (
-          <div style={{ background: 'linear-gradient(135deg, rgba(99,102,241,.12), rgba(168,85,247,.08))', border: '1px solid rgba(99,102,241,.25)', borderRadius: '13px', padding: '18px', marginBottom: '16px' }}>
-            <div style={{ fontWeight: '700', fontSize: '15px', marginBottom: '5px' }}>👋 Welcome to Rooms!</div>
-            <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '12px', lineHeight: '1.6' }}>You&apos;re seeing trending posts. Join rooms to personalise your feed.</div>
+          <div style={{ background: 'linear-gradient(135deg, rgba(225,48,108,.1), rgba(131,58,180,.08))', borderBottom: '1px solid var(--border)', padding: '16px' }}>
+            <div style={{ fontWeight: '700', fontSize: '14px', marginBottom: '4px' }}>👋 Welcome to Rooms!</div>
+            <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '12px' }}>Join rooms to personalise your feed.</div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {suggestedRooms.slice(0, 3).map((r: any) => (
-                <button key={r.id} onClick={() => router.push(`/rooms/${r.id}`)} style={{ padding: '6px 13px', background: 'rgba(99,102,241,.1)', border: '1px solid rgba(99,102,241,.28)', borderRadius: '20px', color: 'var(--accent2)', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
-                  {r.emoji} {r.name}
-                </button>
+                <button key={r.id} onClick={() => router.push(`/rooms/${r.id}`)} style={{ padding: '6px 13px', background: 'rgba(225,48,108,.12)', border: '1px solid rgba(225,48,108,.25)', borderRadius: '20px', color: 'var(--accent)', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>{r.emoji} {r.name}</button>
               ))}
-              <button onClick={() => router.push('/explore')} style={{ padding: '6px 13px', background: 'var(--accent)', border: 'none', borderRadius: '20px', color: '#fff', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>Browse all →</button>
             </div>
           </div>
         )}
 
         {/* Empty state */}
         {posts.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-            <div style={{ fontSize: '40px', marginBottom: '12px' }}>✨</div>
-            <div style={{ fontWeight: '600', fontSize: '16px', marginBottom: '6px', color: 'var(--text2)' }}>Your feed is empty</div>
-            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '16px' }}>Join some rooms and start posting!</div>
-            <button onClick={() => router.push('/explore')} style={{ padding: '9px 20px', background: 'var(--accent)', border: 'none', borderRadius: '9px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Explore Rooms</button>
+          <div style={{ textAlign: 'center', padding: '80px 20px' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>✨</div>
+            <div style={{ fontWeight: '600', fontSize: '18px', marginBottom: '8px' }}>Your feed is empty</div>
+            <div style={{ fontSize: '14px', color: 'var(--text3)', marginBottom: '20px' }}>Join rooms to see posts here</div>
+            <button onClick={() => router.push('/explore')} style={{ padding: '10px 24px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Explore Rooms</button>
           </div>
         )}
 
-        {/* Posts */}
-        {posts.map((post: any, idx: number) => {
+        {/* Posts — Instagram style */}
+        {posts.map((post: any) => {
           const posterName = post.profiles?.name || 'Unknown'
           const posterColor = getColor(posterName)
           const isLiked = liked.has(post.id)
           const isSaved = saved.has(post.id)
           const showComments = openComments.has(post.id)
           return (
-            <div key={post.id} className="fade-up" style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '13px', marginBottom: '14px', overflow: 'hidden', animationDelay: `${idx * 0.04}s` }}>
+            <div key={post.id} style={{ borderBottom: '1px solid var(--border)', marginBottom: '0' }}>
 
-              {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '13px 14px 0' }}>
-                <div onClick={() => router.push(`/users/${post.profiles?.username}`)} style={{ width: '36px', height: '36px', borderRadius: '50%', background: post.profiles?.avatar_url ? 'none' : posterColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '700', color: '#fff', flexShrink: 0, cursor: 'pointer', overflow: 'hidden' }}>
-                  {post.profiles?.avatar_url ? <img src={post.profiles.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : posterName.charAt(0).toUpperCase()}
+              {/* Post header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px' }}>
+                <div onClick={() => router.push(`/users/${post.profiles?.username}`)} style={{ width: '42px', height: '42px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, cursor: 'pointer', background: posterColor }}>
+                  {post.profiles?.avatar_url
+                    ? <img src={post.profiles.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '700', color: '#fff' }}>{posterName.charAt(0).toUpperCase()}</div>
+                  }
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div onClick={() => router.push(`/users/${post.profiles?.username}`)} style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text1)', cursor: 'pointer' }}>{posterName}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    {post.rooms && <span onClick={() => router.push(`/rooms/${post.room_id}`)} style={{ fontSize: '11px', color: 'var(--accent2)', cursor: 'pointer' }}>{post.rooms.emoji} {post.rooms.name}</span>}
-                    <span style={{ fontSize: '11px', color: 'var(--text3)' }}>· {timeAgo(post.created_at)}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span onClick={() => router.push(`/users/${post.profiles?.username}`)} style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text1)', cursor: 'pointer' }}>{posterName}</span>
+                    {post.rooms && <>
+                      <span style={{ color: 'var(--text3)', fontSize: '13px' }}>•</span>
+                      <span onClick={() => router.push(`/rooms/${post.room_id}`)} style={{ fontSize: '12px', color: 'var(--text3)', cursor: 'pointer' }}>{post.rooms.emoji} {post.rooms.name}</span>
+                    </>}
                   </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{timeAgo(post.created_at)}</div>
                 </div>
-                {post.user_id === currentUserId && (
-                  <button onClick={() => deletePost(post.id)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: '4px', fontSize: '14px', borderRadius: '6px', transition: 'color .18s' }}
-                    onMouseOver={e => (e.currentTarget as HTMLElement).style.color = 'var(--red)'}
-                    onMouseOut={e => (e.currentTarget as HTMLElement).style.color = 'var(--text3)'}
-                  >🗑</button>
-                )}
+                <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '20px', padding: '4px', lineHeight: 1 }}
+                  onClick={() => post.user_id === currentUserId ? deletePost(post.id) : (setReporting(post.id), setReportReason(''))}>
+                  ···
+                </button>
               </div>
 
-              {/* Content */}
-              {post.content && <div style={{ padding: '10px 14px', fontSize: '14px', color: 'var(--text2)', lineHeight: '1.65', whiteSpace: 'pre-wrap' }}>{post.content}</div>}
-              {post.media_url && <img src={post.media_url} alt="" style={{ width: '100%', maxHeight: '500px', objectFit: 'cover', display: 'block' }} />}
+              {/* Image — full width */}
+              {post.media_url && (
+                <img src={post.media_url} alt="" style={{ width: '100%', display: 'block', maxHeight: '600px', objectFit: 'cover' }} />
+              )}
+
+              {/* Text content */}
+              {post.content && (
+                <div style={{ padding: post.media_url ? '10px 14px 4px' : '4px 14px 10px', fontSize: '14px', color: 'var(--text1)', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                  <span style={{ fontWeight: '600', marginRight: '6px' }}>{posterName}</span>
+                  {post.content}
+                </div>
+              )}
 
               {/* Poll */}
               {post.type === 'poll' && (
-                <PollBlock
-                  post={post}
-                  pollVotes={pollVotes}
-                  onLoad={() => loadPollData(post.id)}
-                  onVote={(pollId: string, optIdx: number, opts: any[]) => votePoll(pollId, post.id, optIdx, opts)}
-                />
+                <div style={{ padding: '0 14px 8px' }}>
+                  <PollBlock post={post} pollVotes={pollVotes} onLoad={() => loadPollData(post.id)} onVote={(pollId: string, optIdx: number, opts: any[]) => votePoll(pollId, post.id, optIdx, opts)} />
+                </div>
               )}
 
-              {/* Actions */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '7px 10px', borderTop: '1px solid var(--border)' }}>
-                <button onClick={() => toggleLike(post.id)} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 10px', borderRadius: '8px', border: 'none', background: 'none', color: isLiked ? 'var(--red)' : 'var(--text3)', fontSize: '13px', fontWeight: '500', cursor: 'pointer', transition: 'all .18s' }}>
-                  {isLiked ? '❤️' : '🤍'} {post.like_count}
-                </button>
-                <button onClick={() => toggleComments(post.id)} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 10px', borderRadius: '8px', border: 'none', background: 'none', color: showComments ? 'var(--accent2)' : 'var(--text3)', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
-                  💬 {post.comment_count}
-                </button>
-                <button onClick={() => toggleSave(post.id)} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 10px', borderRadius: '8px', border: 'none', background: 'none', color: isSaved ? 'var(--yellow)' : 'var(--text3)', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
-                  🔖 {isSaved ? 'Saved' : 'Save'}
-                </button>
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: '2px' }}>
-                  <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/feed`)} style={{ padding: '6px 10px', borderRadius: '8px', border: 'none', background: 'none', color: 'var(--text3)', fontSize: '13px', cursor: 'pointer' }}>🔗</button>
-                  {post.user_id !== currentUserId && (
-                    <button onClick={() => { setReporting(post.id); setReportReason('') }} style={{ padding: '6px 10px', borderRadius: '8px', border: 'none', background: 'none', color: 'var(--text3)', fontSize: '12px', cursor: 'pointer' }} title="Report post">⚑</button>
-                  )}
+              {/* Actions — Instagram style */}
+              <div style={{ padding: '8px 14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
+                  {/* Like */}
+                  <button onClick={() => toggleLike(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center', color: isLiked ? 'var(--red)' : 'var(--text1)' }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill={isLiked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+                    </svg>
+                  </button>
+                  {/* Comment */}
+                  <button onClick={() => toggleComments(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text1)', display: 'flex', alignItems: 'center' }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                    </svg>
+                  </button>
+                  {/* Share */}
+                  <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/feed`)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text1)', display: 'flex', alignItems: 'center' }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                    </svg>
+                  </button>
+                  {/* Save — pushed right */}
+                  <button onClick={() => toggleSave(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', marginLeft: 'auto', color: isSaved ? 'var(--text1)' : 'var(--text1)', display: 'flex', alignItems: 'center' }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/>
+                    </svg>
+                  </button>
                 </div>
+
+                {/* Like count */}
+                {post.like_count > 0 && (
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text1)', marginBottom: '4px' }}>
+                    {post.like_count.toLocaleString()} like{post.like_count !== 1 ? 's' : ''}
+                  </div>
+                )}
+
+                {/* Comment count */}
+                {post.comment_count > 0 && (
+                  <button onClick={() => toggleComments(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', fontSize: '13px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>
+                    View all {post.comment_count} comment{post.comment_count !== 1 ? 's' : ''}
+                  </button>
+                )}
               </div>
 
-              {/* Comments */}
+              {/* Comments section */}
               {showComments && (
-                <div style={{ borderTop: '1px solid var(--border)' }}>
-                  <div style={{ padding: '8px 14px' }}>
-                    {(comments[post.id] || []).length === 0 && <div style={{ fontSize: '12px', color: 'var(--text3)', padding: '6px 0' }}>No comments yet. Be the first!</div>}
-                    {(comments[post.id] || []).map((c: any) => (
-                      <div key={c.id} style={{ display: 'flex', gap: '8px', padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
-                        <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: getColor(c.profiles?.name || 'U'), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff' }}>{(c.profiles?.name || 'U').charAt(0).toUpperCase()}</div>
-                        <div><span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text1)', marginRight: '6px' }}>{c.profiles?.name}</span><span style={{ fontSize: '13px', color: 'var(--text2)' }}>{c.content}</span></div>
+                <div style={{ padding: '0 14px 8px' }}>
+                  {(comments[post.id] || []).map((c: any) => (
+                    <div key={c.id} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: getColor(c.profiles?.name || 'U'), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: '#fff' }}>
+                        {(c.profiles?.name || 'U').charAt(0).toUpperCase()}
                       </div>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '9px 14px', borderTop: '1px solid var(--border)' }}>
-                    <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff', flexShrink: 0 }}>{name.charAt(0).toUpperCase()}</div>
-                    <input value={commentInput[post.id] || ''} onChange={e => setCommentInput(prev => ({ ...prev, [post.id]: e.target.value }))} onKeyDown={e => e.key === 'Enter' && submitComment(post.id)} placeholder="Add a comment…" style={{ flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '20px', padding: '7px 14px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
-                    <button onClick={() => submitComment(post.id)} style={{ background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', padding: '6px 12px', cursor: 'pointer', fontSize: '12px' }}>Post</button>
+                      <div style={{ fontSize: '13px', color: 'var(--text1)', lineHeight: '1.5' }}>
+                        <span style={{ fontWeight: '600', marginRight: '6px' }}>{c.profiles?.name}</span>
+                        {c.content}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Comment input */}
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: color, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: '#fff' }}>
+                      {name.charAt(0).toUpperCase()}
+                    </div>
+                    <input value={commentInput[post.id] || ''} onChange={e => setCommentInput(prev => ({ ...prev, [post.id]: e.target.value }))} onKeyDown={e => e.key === 'Enter' && submitComment(post.id)} placeholder="Add a comment…" style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text1)', fontSize: '13px', fontFamily: 'inherit' }} />
+                    {commentInput[post.id]?.trim() && (
+                      <button onClick={() => submitComment(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: 'var(--accent)', padding: '0' }}>Post</button>
+                    )}
                   </div>
                 </div>
               )}
@@ -440,22 +490,16 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
 
         {/* Infinite scroll sentinel */}
         <div ref={bottomRef} style={{ height: '1px' }} />
-
-        {/* Loading more */}
-        {loadingMore && (
-          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text3)', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-            <div className="spinner" /> Loading more…
-          </div>
-        )}
-
-        {/* End of feed */}
-        {!hasMore && posts.length > 0 && (
-          <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text3)', fontSize: '12px' }}>
-            You&apos;re all caught up ✨
-          </div>
-        )}
-
+        {loadingMore && <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text3)', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}><div className="spinner" /></div>}
+        {!hasMore && posts.length > 0 && <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text3)', fontSize: '12px' }}>You&apos;re all caught up ✨</div>}
       </div>
+
+      {/* Floating create button */}
+      <button onClick={() => setCreating(true)} style={{ position: 'fixed', bottom: '80px', right: '20px', width: '52px', height: '52px', borderRadius: '50%', background: 'var(--ig-gradient)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(225,48,108,.4)', zIndex: 50 }}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
 
       {/* Report Modal */}
       {reporting && (

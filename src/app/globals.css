@@ -1,62 +1,80 @@
 @import "tailwindcss";
 
 :root {
-  --bg0: #06070a;
-  --bg1: #0c0e13;
-  --bg2: #11141b;
-  --bg3: #171b24;
-  --bg4: #1e2330;
-  --bg5: #242a38;
-  --accent: #6366f1;
-  --accent2: #818cf8;
-  --accentbg: rgba(99,102,241,0.1);
-  --accentbdr: rgba(99,102,241,0.28);
-  --text1: #eef0f5;
-  --text2: #9ba4b8;
-  --text3: #5a6278;
+  /* True black — Instagram-style */
+  --bg0: #000000;
+  --bg1: #000000;
+  --bg2: #111111;
+  --bg3: #1a1a1a;
+  --bg4: #222222;
+  --bg5: #2a2a2a;
+  --accent: #e1306c;        /* Instagram pink/red */
+  --accent2: #f77737;       /* Instagram orange */
+  --accentbg: rgba(225,48,108,0.1);
+  --accentbdr: rgba(225,48,108,0.28);
+  --text1: #ffffff;
+  --text2: #a8a8a8;
+  --text3: #737373;
   --green: #22c55e;
-  --red: #ef4444;
+  --red: #e1306c;
   --yellow: #eab308;
   --orange: #f97316;
-  --pink: #ec4899;
-  --purple: #a855f7;
-  --border: rgba(255,255,255,0.06);
-  --border2: rgba(255,255,255,0.11);
+  --pink: #e1306c;
+  --purple: #833ab4;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+
+  /* Instagram gradient */
+  --ig-gradient: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html { -webkit-text-size-adjust: 100%; }
-html, body { height: 100%; background: var(--bg0); color: var(--text1); font-family: 'Inter', sans-serif; }
+html, body { height: 100%; background: var(--bg0); color: var(--text1); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--bg5); border-radius: 2px; }
+::-webkit-scrollbar { width: 0px; height: 0px; }
 
-@keyframes fadeUp { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:translateY(0) } }
+@keyframes fadeUp { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:translateY(0) } }
 @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.4 } }
-@keyframes glow { 0%,100% { box-shadow:0 0 18px rgba(99,102,241,.25) } 50% { box-shadow:0 0 36px rgba(99,102,241,.55) } }
+@keyframes glow { 0%,100% { box-shadow:0 0 18px rgba(225,48,108,.25) } 50% { box-shadow:0 0 36px rgba(225,48,108,.55) } }
 @keyframes spin { to { transform:rotate(360deg) } }
 @keyframes waveBar { 0%, 100% { height: 4px; } 50% { height: 16px; } }
+@keyframes heartPop { 0% { transform: scale(1) } 50% { transform: scale(1.3) } 100% { transform: scale(1) } }
+@keyframes storyPulse { 0%,100% { opacity:.7 } 50% { opacity:1 } }
 
-.fade-up { animation: fadeUp .32s ease both; }
-.live-dot { display:inline-block; width:7px; height:7px; background:var(--green); border-radius:50%; animation:pulse 2s infinite; }
-.spinner { width:18px; height:18px; border:2px solid rgba(255,255,255,.2); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; flex-shrink: 0; }
+.fade-up { animation: fadeUp .25s ease both; }
+.heart-pop { animation: heartPop .3s ease; }
+.live-dot { display:inline-block; width:6px; height:6px; background:var(--green); border-radius:50%; animation:pulse 2s infinite; }
+.spinner { width:18px; height:18px; border:2px solid rgba(255,255,255,.15); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; flex-shrink: 0; }
 
-/* Button press feedback — makes buttons feel instant */
-button:active, [role="button"]:active { transform: scale(0.96) !important; transition: transform 0.08s ease !important; }
-a:active { opacity: 0.7; }
+/* Button press feedback */
+button:active, [role="button"]:active { transform: scale(0.94) !important; transition: transform 0.06s ease !important; }
+
+/* Story ring — Instagram gradient border */
+.story-ring {
+  background: var(--ig-gradient);
+  border-radius: 50%;
+  padding: 2px;
+  display: inline-flex;
+}
+.story-ring-inner {
+  background: var(--bg0);
+  border-radius: 50%;
+  padding: 2px;
+  display: flex;
+}
 
 /* App shell */
 .app-shell { display: flex; height: 100dvh; overflow: hidden; background: var(--bg0); }
-.app-sidebar { width: 70px; background: var(--bg1); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 12px 0 14px; gap: 2px; flex-shrink: 0; z-index: 50; }
+.app-sidebar { width: 72px; background: var(--bg0); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 16px 0; gap: 4px; flex-shrink: 0; z-index: 50; }
 .app-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
-.app-topbar { height: 52px; flex-shrink: 0; background: rgba(11,13,18,.95); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 10px; z-index: 40; }
+.app-topbar { height: 54px; flex-shrink: 0; background: rgba(0,0,0,.95); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 10px; z-index: 40; }
 .app-content { flex: 1; overflow: hidden; display: flex; }
 .app-mobile-nav { display: none; }
 
 /* Messages */
 .msg-shell { flex: 1; display: flex; overflow: hidden; }
-.msg-sidebar { width: 280px; border-right: 1px solid var(--border); background: var(--bg1); display: flex; flex-direction: column; flex-shrink: 0; }
+.msg-sidebar { width: 280px; border-right: 1px solid var(--border); background: var(--bg0); display: flex; flex-direction: column; flex-shrink: 0; }
 .msg-chat { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
 @media (max-width: 768px) {
@@ -66,19 +84,19 @@ a:active { opacity: 0.7; }
     display: flex !important;
     position: fixed;
     bottom: 0; left: 0; right: 0;
-    height: 60px;
-    background: rgba(11,13,18,.98);
+    height: 56px;
+    background: rgba(0,0,0,.98);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-top: 1px solid var(--border);
     z-index: 100;
     align-items: center;
     justify-content: space-around;
-    padding: 0 4px;
+    padding: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
-  .app-content > * { padding-bottom: 74px; }
+  .app-content > * { padding-bottom: 70px; }
 
   .msg-sidebar { width: 100%; border-right: none; }
   .msg-sidebar.hidden { display: none !important; }
