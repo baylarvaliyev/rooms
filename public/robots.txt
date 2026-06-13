@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Allow: /explore
+Allow: /rooms/
+Allow: /users/
+Allow: /terms
+Allow: /privacy
+
+Disallow: /feed
+Disallow: /messages
+Disallow: /notifications
+Disallow: /settings
+Disallow: /admin
+Disallow: /profile
+Disallow: /api/
+
+Sitemap: https://rooms-rbp4.vercel.app/sitemap.xml

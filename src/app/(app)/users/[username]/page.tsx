@@ -1,6 +1,27 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
+import { Metadata } from 'next'
 import UserProfileClient from './UserProfileClient'
+
+export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
+  const { username } = await params
+  const supabase = await createServerSupabaseClient()
+  const { data: profile } = await supabase.from('profiles').select('name, username, bio').eq('username', username).single()
+  if (!profile) return { title: 'User not found' }
+  return {
+    title: `${profile.name} (@${profile.username})`,
+    description: profile.bio || `${profile.name} is on Rooms. Join the conversation.`,
+    openGraph: {
+      title: `${profile.name} · Rooms`,
+      description: profile.bio || `${profile.name} is on Rooms`,
+    },
+    twitter: {
+      card: 'summary',
+      title: `${profile.name} · Rooms`,
+      description: profile.bio || `${profile.name} is on Rooms`,
+    }
+  }
+}
 
 export default async function UserProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params

@@ -1,10 +1,37 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
+import { Metadata } from 'next'
 import RoomClient from './RoomClient'
 import DebateRoom from './DebateRoom'
 import PinterestRoom from './PinterestRoom'
 import VoiceRoom from './VoiceRoom'
 import MusicRoom from './MusicRoom'
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params
+  const supabase = await createServerSupabaseClient()
+  const { data: room } = await supabase.from('rooms').select('name, description, emoji, category').eq('id', id).single()
+  if (!room) return { title: 'Room not found' }
+
+  const ogUrl = `https://rooms-rbp4.vercel.app/api/og?title=${encodeURIComponent(room.name)}&subtitle=${encodeURIComponent(room.description || `A live ${room.category} room`)}&emoji=${encodeURIComponent(room.emoji)}`
+
+  return {
+    title: `${room.emoji} ${room.name}`,
+    description: room.description || `Join ${room.name} on Rooms — a live ${room.category} community.`,
+    openGraph: {
+      title: `${room.emoji} ${room.name} · Rooms`,
+      description: room.description || `Join ${room.name} on Rooms`,
+      type: 'website',
+      images: [{ url: ogUrl, width: 1200, height: 630 }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${room.emoji} ${room.name} · Rooms`,
+      description: room.description || `Join ${room.name} on Rooms`,
+      images: [ogUrl],
+    }
+  }
+}
 
 export default async function RoomPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
