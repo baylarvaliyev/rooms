@@ -12,11 +12,12 @@ function timeAgo(date: string) {
   return `${Math.floor(s/86400)}d ago`
 }
 
-export default function AdminClient({ stats, recentUsers, recentRooms, recentPosts, currentUserId }: any) {
-  const [tab, setTab] = useState<'overview' | 'users' | 'rooms' | 'posts'>('overview')
+export default function AdminClient({ stats, recentUsers, recentRooms, recentPosts, reports: initialReports, currentUserId }: any) {
+  const [tab, setTab] = useState<'overview' | 'users' | 'rooms' | 'posts' | 'reports'>('overview')
   const [users, setUsers] = useState(recentUsers)
   const [rooms, setRooms] = useState(recentRooms)
   const [posts, setPosts] = useState(recentPosts)
+  const [reports, setReports] = useState(initialReports || [])
   const router = useRouter()
   const supabase = createClient()
 
@@ -30,6 +31,18 @@ export default function AdminClient({ stats, recentUsers, recentRooms, recentPos
     if (!confirm('Delete this post?')) return
     await supabase.from('posts').delete().eq('id', id)
     setPosts((prev: any[]) => prev.filter(p => p.id !== id))
+  }
+
+  async function dismissReport(id: string) {
+    await supabase.from('reports').update({ status: 'dismissed' }).eq('id', id)
+    setReports((prev: any[]) => prev.map(r => r.id === id ? { ...r, status: 'dismissed' } : r))
+  }
+
+  async function resolveReport(id: string, postId: string) {
+    if (!confirm('Delete the reported post and resolve this report?')) return
+    await supabase.from('posts').delete().eq('id', postId)
+    await supabase.from('reports').update({ status: 'resolved' }).eq('id', id)
+    setReports((prev: any[]) => prev.map(r => r.id === id ? { ...r, status: 'resolved' } : r))
   }
 
   const statCards = [
@@ -63,6 +76,7 @@ export default function AdminClient({ stats, recentUsers, recentRooms, recentPos
             { id: 'users', label: '👥 Users' },
             { id: 'rooms', label: '🚪 Rooms' },
             { id: 'posts', label: '✍️ Posts' },
+            { id: 'reports', label: `🚩 Reports${reports.filter((r: any) => r.status === 'pending').length > 0 ? ` (${reports.filter((r: any) => r.status === 'pending').length})` : ''}` },
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id as any)} style={{
               padding: '9px 16px', border: 'none', background: 'none',
@@ -240,6 +254,44 @@ export default function AdminClient({ stats, recentUsers, recentRooms, recentPos
                 <button onClick={() => deletePost(p.id)} style={{ padding: '5px 11px', background: 'var(--redbg, rgba(239,68,68,.1))', border: '1px solid rgba(239,68,68,.2)', borderRadius: '7px', color: 'var(--red)', fontSize: '12px', cursor: 'pointer', flexShrink: 0 }}>
                   Delete
                 </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {/* Reports tab */}
+        {tab === 'reports' && (
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '13px', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '13px', fontWeight: '600' }}>
+                Reports · {reports.filter((r: any) => r.status === 'pending').length} pending
+              </div>
+            </div>
+            {reports.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text3)', fontSize: '13px' }}>No reports yet 🎉</div>
+            ) : reports.map((r: any) => (
+              <div key={r.id} style={{ padding: '14px', borderBottom: '1px solid var(--border)', opacity: r.status !== 'pending' ? .5 : 1 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: r.status === 'pending' ? 'var(--red)' : 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{r.status}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--text3)' }}>{timeAgo(r.created_at)}</span>
+                    </div>
+                    <div style={{ fontSize: '13px', color: 'var(--text1)', marginBottom: '4px' }}>
+                      <strong>Reason:</strong> {r.reason}
+                    </div>
+                    {r.posts?.content && (
+                      <div style={{ fontSize: '12px', color: 'var(--text3)', background: 'var(--bg3)', padding: '8px 10px', borderRadius: '7px', marginTop: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        Post: {r.posts.content}
+                      </div>
+                    )}
+                  </div>
+                  {r.status === 'pending' && (
+                    <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                      <button onClick={() => dismissReport(r.id)} style={{ padding: '5px 11px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '7px', color: 'var(--text2)', fontSize: '12px', cursor: 'pointer' }}>Dismiss</button>
+                      {r.post_id && <button onClick={() => resolveReport(r.id, r.post_id)} style={{ padding: '5px 11px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '7px', color: 'var(--red)', fontSize: '12px', cursor: 'pointer' }}>Delete Post</button>}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>

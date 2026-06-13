@@ -38,6 +38,8 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
   const [pollQuestion, setPollQuestion] = useState('')
   const [pollOptions, setPollOptions] = useState(['', ''])
   const [pollVotes, setPollVotes] = useState<Record<string, number>>({}) // pollId -> optionIndex voted
+  const [reporting, setReporting] = useState<string | null>(null)
+  const [reportReason, setReportReason] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
@@ -125,6 +127,18 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
     if (!confirm('Delete this post? This cannot be undone.')) return
     await supabase.from('posts').delete().eq('id', postId).eq('user_id', currentUserId)
     setPosts((prev: any[]) => prev.filter((p: any) => p.id !== postId))
+  }
+
+  async function submitReport(postId: string) {
+    if (!reportReason.trim()) return
+    await supabase.from('reports').insert({
+      reporter_id: currentUserId,
+      post_id: postId,
+      reason: reportReason
+    })
+    setReporting(null)
+    setReportReason('')
+    alert('Report submitted. Thank you.')
   }
 
   async function submitComment(postId: string) {
@@ -311,7 +325,12 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
                 <button onClick={() => toggleSave(post.id)} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 10px', borderRadius: '8px', border: 'none', background: 'none', color: isSaved ? 'var(--yellow)' : 'var(--text3)', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
                   🔖 {isSaved ? 'Saved' : 'Save'}
                 </button>
-                <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/feed`)} style={{ marginLeft: 'auto', padding: '6px 10px', borderRadius: '8px', border: 'none', background: 'none', color: 'var(--text3)', fontSize: '13px', cursor: 'pointer' }}>🔗</button>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: '2px' }}>
+                  <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/feed`)} style={{ padding: '6px 10px', borderRadius: '8px', border: 'none', background: 'none', color: 'var(--text3)', fontSize: '13px', cursor: 'pointer' }}>🔗</button>
+                  {post.user_id !== currentUserId && (
+                    <button onClick={() => { setReporting(post.id); setReportReason('') }} style={{ padding: '6px 10px', borderRadius: '8px', border: 'none', background: 'none', color: 'var(--text3)', fontSize: '12px', cursor: 'pointer' }} title="Report post">⚑</button>
+                  )}
+                </div>
               </div>
 
               {/* Comments */}
@@ -355,6 +374,28 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
         )}
 
       </div>
+
+      {/* Report Modal */}
+      {reporting && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(8px)', zIndex: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+          onClick={e => e.target === e.currentTarget && setReporting(null)}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '400px' }}>
+            <div style={{ fontWeight: '700', fontSize: '16px', marginBottom: '6px' }}>Report Post</div>
+            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '16px' }}>Why are you reporting this post?</div>
+            <div style={{ display: 'grid', gap: '8px', marginBottom: '14px' }}>
+              {['Spam', 'Harassment', 'Misinformation', 'Inappropriate content', 'Other'].map(r => (
+                <div key={r} onClick={() => setReportReason(r)} style={{ padding: '10px 14px', borderRadius: '9px', cursor: 'pointer', border: `1px solid ${reportReason === r ? 'var(--accent)' : 'var(--border)'}`, background: reportReason === r ? 'var(--accentbg)' : 'var(--bg3)', color: reportReason === r ? 'var(--accent2)' : 'var(--text2)', fontSize: '13px', transition: 'all .18s' }}>
+                  {r}
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setReporting(null)} style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '9px', color: 'var(--text2)', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
+              <button onClick={() => submitReport(reporting)} disabled={!reportReason} style={{ flex: 1, padding: '10px', background: 'var(--red)', border: 'none', borderRadius: '9px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '600', opacity: !reportReason ? .5 : 1 }}>Submit Report</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Post Modal */}
       {creating && (

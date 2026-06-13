@@ -176,6 +176,13 @@ export default function SettingsPage() {
         }}>
           {loading ? <><div className="spinner" />Signing out…</> : '↩ Sign out'}
         </button>
+
+        {/* Legal */}
+        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginTop: '24px' }}>
+          <a href="/terms" style={{ fontSize: '12px', color: 'var(--text3)', textDecoration: 'none' }}>Terms of Service</a>
+          <span style={{ color: 'var(--text3)', fontSize: '12px' }}>·</span>
+          <a href="/privacy" style={{ fontSize: '12px', color: 'var(--text3)', textDecoration: 'none' }}>Privacy Policy</a>
+        </div>
       </div>
     </div>
   )

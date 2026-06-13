@@ -5,13 +5,21 @@
   --bg1: #0c0e13;
   --bg2: #11141b;
   --bg3: #171b24;
+  --bg4: #1e2330;
+  --bg5: #242a38;
   --accent: #6366f1;
   --accent2: #818cf8;
+  --accentbg: rgba(99,102,241,0.1);
+  --accentbdr: rgba(99,102,241,0.28);
   --text1: #eef0f5;
   --text2: #9ba4b8;
   --text3: #5a6278;
   --green: #22c55e;
   --red: #ef4444;
+  --yellow: #eab308;
+  --orange: #f97316;
+  --pink: #ec4899;
+  --purple: #a855f7;
   --border: rgba(255,255,255,0.06);
   --border2: rgba(255,255,255,0.11);
 }
@@ -23,6 +31,10 @@ html, body { height: 100%; background: var(--bg0); color: var(--text1); font-fam
 @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.35 } }
 @keyframes glow { 0%,100% { box-shadow:0 0 18px rgba(99,102,241,.25) } 50% { box-shadow:0 0 36px rgba(99,102,241,.55) } }
 @keyframes spin { to { transform:rotate(360deg) } }
+@keyframes waveBar {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
+}
 
 .fade-up { animation: fadeUp .32s ease both; }
 .live-dot { display:inline-block; width:7px; height:7px; background:var(--green); border-radius:50%; animation:pulse 2s infinite; }
