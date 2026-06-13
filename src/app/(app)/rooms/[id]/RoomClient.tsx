@@ -18,33 +18,38 @@ export default function RoomClient({ room, initialMessages, members, currentUser
   const [joined, setJoined] = useState(isMember)
   const [sending, setSending] = useState(false)
   const [showMembers, setShowMembers] = useState(false)
+  const [onlineCount, setOnlineCount] = useState(1)
   const bottomRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
   const router = useRouter()
 
-  // Scroll to bottom
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Real-time subscription
   useEffect(() => {
-    const channel = supabase
-      .channel(`room:${room.id}`)
+    const myName = currentUser?.user_metadata?.name || currentUser?.email?.split('@')[0] || 'User'
+
+    // Presence + messages channel combined
+    const channel = supabase.channel(`room:${room.id}`, {
+      config: { presence: { key: currentUser.id } }
+    })
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState()
+        setOnlineCount(Object.keys(state).length)
+      })
       .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
+        event: 'INSERT', schema: 'public', table: 'messages',
         filter: `room_id=eq.${room.id}`
       }, async (payload) => {
-        const { data } = await supabase
-          .from('messages')
-          .select('*, profiles(name, username)')
-          .eq('id', payload.new.id)
-          .single()
+        const { data } = await supabase.from('messages').select('*, profiles(name, username)').eq('id', payload.new.id).single()
         if (data) setMessages((prev: any[]) => [...prev, data])
       })
-      .subscribe()
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ user_id: currentUser.id, name: myName, online_at: new Date().toISOString() })
+        }
+      })
 
     return () => { supabase.removeChannel(channel) }
   }, [room.id])
@@ -98,7 +103,9 @@ export default function RoomClient({ room, initialMessages, members, currentUser
             <div style={{ fontWeight: '600', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {room.name} <span className="live-dot" />
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{members.length} members</div>
+            <div style={{ fontSize: '11px', color: 'var(--text3)' }}>
+              {members.length} members · <span style={{ color: 'var(--green)' }}>{onlineCount} online now</span>
+            </div>
           </div>
           {/* Members toggle button */}
           <button onClick={() => setShowMembers(s => !s)} style={{ background: showMembers ? 'var(--accentbg)' : 'none', border: `1px solid ${showMembers ? 'var(--accentbdr)' : 'var(--border)'}`, borderRadius: '8px', color: showMembers ? 'var(--accent2)' : 'var(--text3)', cursor: 'pointer', fontSize: '12px', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>

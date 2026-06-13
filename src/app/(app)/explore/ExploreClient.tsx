@@ -114,7 +114,7 @@ export default function ExploreClient({ rooms, trendingRooms }: { rooms: any[], 
                 <div style={{ height: '110px', background: ROOM_COLORS[r.category] || 'linear-gradient(135deg,#1a1a4e,#312a7e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '48px', position: 'relative' }}>
                   {r.emoji}
                   <div style={{ position: 'absolute', top: '9px', left: '9px', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(8px)', borderRadius: '20px', fontSize: '10px', fontWeight: '500', color: '#fff' }}>
-                    <span className="live-dot" style={{ width: '5px', height: '5px' }} />{r.online_count || 0} live
+                    <span className="live-dot" style={{ width: '5px', height: '5px' }} />live
                   </div>
                   <div style={{ position: 'absolute', top: '9px', right: '9px', padding: '3px 8px', background: 'rgba(99,102,241,.25)', borderRadius: '20px', fontSize: '10px', fontWeight: '600', color: '#a5b4fc' }}>{r.type}</div>
                 </div>

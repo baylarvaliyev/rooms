@@ -266,7 +266,7 @@ export default function LeaderboardClient({ topUsers, topRooms, topPosters, curr
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text1)' }}>{r.name}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text3)' }}>
-                    {r.member_count?.toLocaleString()} members · <span style={{ color: 'var(--green)' }}>{r.online_count || 0} live</span>
+                    {r.member_count?.toLocaleString()} members
                   </div>
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text3)', flexShrink: 0 }}>{r.category}</div>
