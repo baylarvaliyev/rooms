@@ -10,7 +10,10 @@ function getColor(name: string) {
   return COLORS[Math.abs(hash) % COLORS.length]
 }
 
-export default function MessagesClient({ currentUser, allUsers }: any) {
+export default function MessagesClient({ currentUser: initialUser, allUsers: initialUsers }: any) {
+  const [currentUser, setCurrentUser] = useState(initialUser || null)
+  const [allUsers, setAllUsers] = useState(initialUsers || [])
+  const [dataLoading, setDataLoading] = useState(!initialUser)
   const [conversations, setConversations] = useState<any[]>([])
   const [activeUser, setActiveUser] = useState<any>(null)
   const [messages, setMessages] = useState<any[]>([])
@@ -22,7 +25,25 @@ export default function MessagesClient({ currentUser, allUsers }: any) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
-  useEffect(() => { loadConversations() }, [])
+  useEffect(() => {
+    if (!initialUser) {
+      loadUser().then(() => loadConversations())
+    } else {
+      loadConversations()
+    }
+  }, [])
+
+  async function loadUser() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const [{ data: profile }, { data: users }] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', user.id).single(),
+      supabase.from('profiles').select('id, name, username').neq('id', user.id).limit(50),
+    ])
+    setCurrentUser({ id: user.id, ...profile })
+    setAllUsers(users || [])
+    setDataLoading(false)
+  }
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   useEffect(() => {
@@ -75,10 +96,29 @@ export default function MessagesClient({ currentUser, allUsers }: any) {
     u.username.toLowerCase().includes(search.toLowerCase())
   )
 
+  if (dataLoading) {
+    return (
+      <div className="msg-shell">
+        <div className="msg-sidebar">
+          <div style={{ padding: '14px', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ height: '14px', background: 'var(--bg4)', borderRadius: '6px', width: '40%', animation: 'pulse 1.5s infinite' }} />
+          </div>
+          {[1,2,3].map(i => (
+            <div key={i} style={{ display: 'flex', gap: '10px', padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg4)', flexShrink: 0, animation: 'pulse 1.5s infinite' }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ height: '12px', background: 'var(--bg4)', borderRadius: '6px', width: '60%', marginBottom: '7px', animation: 'pulse 1.5s infinite' }} />
+                <div style={{ height: '10px', background: 'var(--bg4)', borderRadius: '6px', width: '40%', animation: 'pulse 1.5s infinite' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="msg-shell">
-
-      {/* SIDEBAR LIST */}
       <div className={`msg-sidebar${view === 'chat' ? ' hidden' : ''}`}>
 
         <div style={{ padding: '14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

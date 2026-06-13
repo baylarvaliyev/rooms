@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase'
 
 const COLORS = ['#6366f1','#0891b2','#ec4899','#16a34a','#0f766e','#7c3aed','#d97706','#f97316']
 function getColor(name: string) {
@@ -24,9 +25,52 @@ const ROOM_COLORS: Record<string, string> = {
   Lifestyle: 'linear-gradient(135deg,#0a0a2a,#1a1a4e)',
 }
 
-export default function LeaderboardClient({ topUsers, topRooms, topPosters, currentUserId }: any) {
+export default function LeaderboardClient({ topUsers: initialUsers, topRooms: initialRooms, topPosters: initialPosters, currentUserId: initialUserId }: any) {
+  const [topUsers, setTopUsers] = useState(initialUsers || [])
+  const [topRooms, setTopRooms] = useState(initialRooms || [])
+  const [topPosters, setTopPosters] = useState(initialPosters || [])
+  const [currentUserId, setCurrentUserId] = useState(initialUserId || '')
+  const [loading, setLoading] = useState(!initialUsers)
   const [tab, setTab] = useState<'reputation' | 'posts' | 'rooms'>('reputation')
   const router = useRouter()
+  const supabase = createClient()
+
+  useEffect(() => {
+    if (!initialUsers) loadData()
+  }, [])
+
+  async function loadData() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    setCurrentUserId(user.id)
+
+    const [{ data: users }, { data: rooms }, { data: posts }] = await Promise.all([
+      supabase.from('profiles').select('id, name, username, avatar_url, reputation').order('reputation', { ascending: false }).limit(20),
+      supabase.from('rooms').select('id, name, emoji, category, member_count').order('member_count', { ascending: false }).limit(10),
+      supabase.from('posts').select('user_id, profiles(name, username, avatar_url)').limit(100),
+    ])
+
+    setTopUsers(users || [])
+    setTopRooms(rooms || [])
+
+    const counts: Record<string, any> = {}
+    ;(posts || []).forEach((p: any) => {
+      if (!counts[p.user_id]) counts[p.user_id] = { count: 0, ...p.profiles }
+      counts[p.user_id].count++
+    })
+    setTopPosters(Object.values(counts).sort((a: any, b: any) => b.count - a.count).slice(0, 10))
+    setLoading(false)
+  }
+
+  if (loading) {
+    return (
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+        <div style={{ maxWidth: '680px', margin: '0 auto', textAlign: 'center', paddingTop: '60px' }}>
+          <div className="spinner" style={{ margin: '0 auto' }} />
+        </div>
+      </div>
+    )
+  }
 
   const podiumUsers = [topUsers[1], topUsers[0], topUsers[2]].filter(Boolean)
   const podiumHeights = [100, 130, 85]

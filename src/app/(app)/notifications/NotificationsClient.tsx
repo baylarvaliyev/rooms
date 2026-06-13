@@ -1,0 +1,124 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase'
+
+const COLORS = ['#6366f1','#0891b2','#ec4899','#16a34a','#0f766e','#7c3aed','#d97706','#f97316']
+function getColor(str: string) {
+  let h = 0; for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h)
+  return COLORS[Math.abs(h) % COLORS.length]
+}
+function timeAgo(date: string) {
+  const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+  if (s < 60) return `${s}s ago`
+  if (s < 3600) return `${Math.floor(s/60)}m ago`
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`
+  return `${Math.floor(s/86400)}d ago`
+}
+
+const NOTIF_META: Record<string, { icon: string, label: string }> = {
+  like:     { icon: '❤️', label: 'liked your post' },
+  comment:  { icon: '💬', label: 'commented on your post' },
+  follow:   { icon: '👤', label: 'started following you' },
+  post:     { icon: '✍️', label: 'posted in' },
+}
+
+export default function NotificationsClient() {
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+  const supabase = createClient()
+
+  useEffect(() => {
+    loadNotifications()
+  }, [])
+
+  async function loadNotifications() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data } = await supabase
+      .from('notifications')
+      .select('*, actor:profiles!notifications_actor_id_fkey(name, username, avatar_url)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    setNotifications(data || [])
+
+    // Mark all as read
+    await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
+    setLoading(false)
+  }
+
+  if (loading) {
+    return (
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+        <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+          {[1,2,3,4,5].map(i => (
+            <div key={i} style={{ display: 'flex', gap: '12px', padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'var(--bg4)', flexShrink: 0, animation: 'pulse 1.5s infinite' }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ height: '12px', background: 'var(--bg4)', borderRadius: '6px', width: '70%', marginBottom: '7px', animation: 'pulse 1.5s infinite' }} />
+                <div style={{ height: '10px', background: 'var(--bg4)', borderRadius: '6px', width: '30%', animation: 'pulse 1.5s infinite' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
+      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+
+        {notifications.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '80px 20px' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔔</div>
+            <div style={{ fontWeight: '600', fontSize: '18px', marginBottom: '8px' }}>No notifications yet</div>
+            <div style={{ fontSize: '14px', color: 'var(--text3)' }}>When someone likes or comments, you'll see it here</div>
+          </div>
+        )}
+
+        {notifications.map(n => {
+          const meta = NOTIF_META[n.type] || { icon: '🔔', label: 'activity' }
+          const actorName = n.actor?.name || 'Someone'
+          const color = getColor(actorName)
+          return (
+            <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', borderBottom: '1px solid var(--border)', background: n.read ? 'transparent' : 'rgba(225,48,108,.04)', cursor: 'pointer', transition: 'background .18s' }}
+              onClick={() => n.actor?.username && router.push(`/users/${n.actor.username}`)}
+              onMouseOver={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg2)'}
+              onMouseOut={e => (e.currentTarget as HTMLElement).style.background = n.read ? 'transparent' : 'rgba(225,48,108,.04)'}
+            >
+              {/* Avatar */}
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: n.actor?.avatar_url ? 'none' : color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '700', color: '#fff', overflow: 'hidden' }}>
+                  {n.actor?.avatar_url
+                    ? <img src={n.actor.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : actorName.charAt(0).toUpperCase()
+                  }
+                </div>
+                <div style={{ position: 'absolute', bottom: 0, right: 0, fontSize: '14px', lineHeight: 1 }}>{meta.icon}</div>
+              </div>
+
+              {/* Content */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '14px', color: 'var(--text1)', lineHeight: '1.5' }}>
+                  <span style={{ fontWeight: '600' }}>{actorName}</span>
+                  {' '}{meta.label}
+                  {n.room_name && <span style={{ color: 'var(--text3)' }}> {n.room_name}</span>}
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>{timeAgo(n.created_at)}</div>
+              </div>
+
+              {/* Unread dot */}
+              {!n.read && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
