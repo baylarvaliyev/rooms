@@ -37,7 +37,7 @@ export default function LeaderboardClient({ topUsers, topRooms, topPosters, curr
   ]
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '22px' }}>
+    <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
       <div style={{ maxWidth: '680px', margin: '0 auto' }}>
 
         {/* Header */}

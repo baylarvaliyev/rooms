@@ -124,7 +124,7 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
   }
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '22px' }}>
+    <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
       <div style={{ maxWidth: '700px', margin: '0 auto' }}>
 
         {/* Profile card */}

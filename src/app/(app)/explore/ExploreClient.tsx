@@ -66,7 +66,7 @@ export default function ExploreClient({ rooms, trendingRooms }: { rooms: any[], 
       </div>
 
       {/* Scrollable content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
 
         {/* Trending */}
         {trendingRooms && trendingRooms.length > 0 && cat === 'All' && !search && (
@@ -105,7 +105,7 @@ export default function ExploreClient({ rooms, trendingRooms }: { rooms: any[], 
             <div style={{ fontSize: '13px' }}>Be the first to create one!</div>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '13px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
             {filtered.map((r, i) => (
               <div key={r.id} onClick={() => router.push(`/rooms/${r.id}`)} className="fade-up" style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '13px', overflow: 'hidden', cursor: 'pointer', transition: 'all .2s', animationDelay: `${i * 0.04}s` }}
                 onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.11)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
