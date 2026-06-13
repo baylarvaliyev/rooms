@@ -43,15 +43,20 @@ export default function VoiceRoom({ room, members, currentUser, isMember }: any)
     setLoading(true)
     setError('')
     try {
-      // Get Daily room + token from our API
-      const roomName = `rooms-${room.id.replace(/-/g, '').slice(0, 20)}`
+      // Safe room name — Daily requires lowercase letters, numbers, hyphens only
+      const roomName = `room-${room.id.replace(/-/g, '').slice(0, 40)}`
       const res = await fetch('/api/daily', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'get-or-create-room', roomName, isOwner })
       })
-      const { url, token, error: apiError } = await res.json()
-      if (apiError) { setError('Failed to create room. Try again.'); setLoading(false); return }
+      const json = await res.json()
+      if (!res.ok || json.error) {
+        setError(json.error || 'Failed to connect. Try again.')
+        setLoading(false)
+        return
+      }
+      const { url, token } = json
 
       // Dynamically import Daily to avoid SSR issues
       const DailyIframe = (await import('@daily-co/daily-js')).default

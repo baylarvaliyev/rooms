@@ -6,48 +6,72 @@ const DAILY_KEY = process.env.DAILY_API_KEY!
 async function dailyFetch(path: string, method = 'GET', body?: any) {
   const res = await fetch(`${DAILY_API}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${DAILY_KEY}` },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${DAILY_KEY}`
+    },
     ...(body ? { body: JSON.stringify(body) } : {})
   })
-  return res.json()
+  const data = await res.json()
+  return { data, ok: res.ok }
 }
 
 export async function POST(req: NextRequest) {
-  const { action, roomName, isOwner } = await req.json()
+  try {
+    const { action, roomName, isOwner } = await req.json()
 
-  if (action === 'get-or-create-room') {
-    // Try to get existing room first
-    const existing = await dailyFetch(`/rooms/${roomName}`)
-    let room = existing
-    if (existing.error) {
-      // Create new room
-      room = await dailyFetch('/rooms', 'POST', {
-        name: roomName,
+    if (action === 'get-or-create-room') {
+      // Daily room names: only lowercase letters, numbers, hyphens, max 255 chars
+      const safeName = roomName.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 60)
+
+      // Try to get existing room
+      let roomUrl = ''
+      const { data: existing, ok: existsOk } = await dailyFetch(`/rooms/${safeName}`)
+
+      if (existsOk && existing.url) {
+        roomUrl = existing.url
+      } else {
+        // Create new room
+        const { data: created, ok: createdOk } = await dailyFetch('/rooms', 'POST', {
+          name: safeName,
+          properties: {
+            enable_chat: false,
+            enable_knocking: false,
+            enable_screenshare: false,
+            start_audio_off: true,
+            start_video_off: true,
+            exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7,
+          }
+        })
+        if (!createdOk) {
+          console.error('Daily create room error:', created)
+          return NextResponse.json({ error: created.error || 'Failed to create room' }, { status: 400 })
+        }
+        roomUrl = created.url
+      }
+
+      // Generate meeting token
+      const { data: tokenData, ok: tokenOk } = await dailyFetch('/meeting-tokens', 'POST', {
         properties: {
-          enable_chat: false,
-          enable_knocking: true,        // Members must be let in by owner
-          enable_screenshare: false,
-          start_audio_off: true,        // Everyone joins muted
-          start_video_off: true,        // No video in voice rooms
-          max_participants: 50,
-          exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24, // 24h expiry
+          room_name: safeName,
+          is_owner: isOwner,
+          start_audio_off: !isOwner,
+          enable_recording: false,
+          exp: Math.floor(Date.now() / 1000) + 60 * 60 * 4,
         }
       })
-    }
-    if (room.error) return NextResponse.json({ error: room.error }, { status: 400 })
 
-    // Generate a meeting token
-    const token = await dailyFetch('/meeting-tokens', 'POST', {
-      properties: {
-        room_name: roomName,
-        is_owner: isOwner,            // Owner can admit/remove participants
-        start_audio_off: !isOwner,    // Owner joins with mic, others muted
-        enable_recording: false,
+      if (!tokenOk) {
+        console.error('Daily token error:', tokenData)
+        return NextResponse.json({ error: 'Failed to generate token' }, { status: 400 })
       }
-    })
 
-    return NextResponse.json({ url: room.url, token: token.token })
+      return NextResponse.json({ url: roomUrl, token: tokenData.token })
+    }
+
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
+  } catch (e: any) {
+    console.error('Daily API route error:', e)
+    return NextResponse.json({ error: e.message }, { status: 500 })
   }
-
-  return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
 }
