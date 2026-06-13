@@ -18,10 +18,16 @@ function timeAgo(date: string) {
   return `${Math.floor(s/86400)}d ago`
 }
 
-export default function FeedClient({ posts: initialPosts, likedIds, savedIds, profile, rooms, currentUserId, isNewUser, suggestedRooms }: any) {
-  const [posts, setPosts] = useState(initialPosts)
-  const [liked, setLiked] = useState<Set<string>>(new Set(likedIds))
-  const [saved, setSaved] = useState<Set<string>>(new Set(savedIds))
+export default function FeedClient({ posts: initialPosts, likedIds: initialLikedIds, savedIds: initialSavedIds, profile: initialProfile, rooms: initialRooms, currentUserId: initialUserId, isNewUser: initialIsNewUser, suggestedRooms: initialSuggestedRooms }: any) {
+  const [posts, setPosts] = useState(initialPosts || [])
+  const [liked, setLiked] = useState<Set<string>>(new Set(initialLikedIds || []))
+  const [saved, setSaved] = useState<Set<string>>(new Set(initialSavedIds || []))
+  const [profile, setProfile] = useState(initialProfile || null)
+  const [rooms, setRooms] = useState(initialRooms || [])
+  const [currentUserId, setCurrentUserId] = useState(initialUserId || '')
+  const [isNewUser, setIsNewUser] = useState(initialIsNewUser || false)
+  const [suggestedRooms, setSuggestedRooms] = useState(initialSuggestedRooms || [])
+  const [dataLoading, setDataLoading] = useState(!initialPosts)
   const [openComments, setOpenComments] = useState<Set<string>>(new Set())
   const [comments, setComments] = useState<Record<string, any[]>>({})
   const [commentInput, setCommentInput] = useState<Record<string, string>>({})
@@ -31,19 +37,73 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [hasMore, setHasMore] = useState(initialPosts.length === 30)
+  const [hasMore, setHasMore] = useState((initialPosts?.length || 0) === 30)
   const [page, setPage] = useState(0)
-  // Poll state
   const [postType, setPostType] = useState<'post' | 'poll'>('post')
   const [pollQuestion, setPollQuestion] = useState('')
   const [pollOptions, setPollOptions] = useState(['', ''])
-  const [pollVotes, setPollVotes] = useState<Record<string, number>>({}) // pollId -> optionIndex voted
+  const [pollVotes, setPollVotes] = useState<Record<string, number>>({})
   const [reporting, setReporting] = useState<string | null>(null)
   const [reportReason, setReportReason] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
   const router = useRouter()
+
+  // Self-fetch if no initial data (client-side navigation)
+  useEffect(() => {
+    if (!initialPosts) loadFeed()
+  }, [])
+
+  async function loadFeed() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    setCurrentUserId(user.id)
+
+    const [
+      { data: profileData },
+      { data: joinedRooms },
+      { data: following },
+      { data: likes },
+      { data: savedData },
+      { data: roomsForPost },
+    ] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', user.id).single(),
+      supabase.from('room_members').select('room_id').eq('user_id', user.id),
+      supabase.from('follows').select('following_id').eq('follower_id', user.id),
+      supabase.from('likes').select('post_id').eq('user_id', user.id),
+      supabase.from('saved_posts').select('post_id').eq('user_id', user.id),
+      supabase.from('room_members').select('rooms(id, name, emoji)').eq('user_id', user.id),
+    ])
+
+    setProfile(profileData)
+    setLiked(new Set((likes || []).map((l: any) => l.post_id)))
+    setSaved(new Set((savedData || []).map((s: any) => s.post_id)))
+    setRooms((roomsForPost || []).map((r: any) => r.rooms).filter(Boolean))
+
+    const joinedRoomIds = (joinedRooms || []).map((r: any) => r.room_id)
+    const followingIds = (following || []).map((f: any) => f.following_id)
+    const conditions: string[] = []
+    if (joinedRoomIds.length > 0) conditions.push(`room_id.in.(${joinedRoomIds.join(',')})`)
+    if (followingIds.length > 0) conditions.push(`user_id.in.(${followingIds.join(',')})`)
+
+    const fallbackId = '00000000-0000-0000-0000-000000000000'
+    const notInIds = joinedRoomIds.length > 0 ? joinedRoomIds.join(',') : fallbackId
+
+    const [postsResult, { data: suggested }] = await Promise.all([
+      conditions.length > 0
+        ? supabase.from('posts').select('*, profiles(name, username, avatar_url), rooms(name, emoji, category)').or(conditions.join(',')).order('created_at', { ascending: false }).limit(30)
+        : supabase.from('posts').select('*, profiles(name, username, avatar_url), rooms(name, emoji, category)').order('like_count', { ascending: false }).limit(30),
+      supabase.from('rooms').select('id, name, emoji, category, member_count').not('id', 'in', `(${notInIds})`).order('member_count', { ascending: false }).limit(5),
+    ])
+
+    const fetchedPosts = postsResult.data || []
+    setPosts(fetchedPosts)
+    setSuggestedRooms(suggested || [])
+    setIsNewUser(joinedRoomIds.length === 0 && followingIds.length === 0)
+    setHasMore(fetchedPosts.length === 30)
+    setDataLoading(false)
+  }
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -226,6 +286,28 @@ export default function FeedClient({ posts: initialPosts, likedIds, savedIds, pr
 
   const name = profile?.name || 'You'
   const color = getColor(name)
+
+  if (dataLoading) {
+    return (
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px' }}>
+        <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '14px', padding: '16px', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'var(--bg4)', flexShrink: 0, animation: 'pulse 1.5s infinite' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ height: '12px', background: 'var(--bg4)', borderRadius: '6px', marginBottom: '7px', width: '35%', animation: 'pulse 1.5s infinite' }} />
+                  <div style={{ height: '10px', background: 'var(--bg4)', borderRadius: '6px', width: '20%', animation: 'pulse 1.5s infinite' }} />
+                </div>
+              </div>
+              <div style={{ height: '13px', background: 'var(--bg4)', borderRadius: '6px', marginBottom: '8px', width: '90%', animation: 'pulse 1.5s infinite' }} />
+              <div style={{ height: '13px', background: 'var(--bg4)', borderRadius: '6px', width: '60%', animation: 'pulse 1.5s infinite' }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '22px' }}>
