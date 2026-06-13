@@ -72,15 +72,18 @@ export default function ExploreClient() {
     <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
       {/* Topbar */}
-      <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0, background: 'var(--bg1)' }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search rooms…" style={{ flex: 1, maxWidth: '360px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '9px', padding: '8px 14px', color: 'var(--text1)', fontSize: '13px', outline: 'none' }} />
-        <button onClick={() => setCreating(true)} style={{ padding: '8px 16px', background: 'var(--accent)', border: 'none', borderRadius: '9px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>+ New Room</button>
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg3)', borderRadius: '10px', padding: '8px 14px' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search rooms…" style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text1)', fontSize: '14px', fontFamily: 'inherit' }} />
+        </div>
+        <button onClick={() => setCreating(true)} style={{ padding: '8px 16px', background: 'var(--ig-gradient)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Room</button>
       </div>
 
       {/* Categories */}
       <div style={{ display: 'flex', gap: '8px', padding: '12px 20px', overflowX: 'auto', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
         {CATEGORIES.map(c => (
-          <div key={c} onClick={() => setCat(c)} style={{ padding: '6px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: '500', whiteSpace: 'nowrap', background: cat === c ? 'var(--accent)' : 'var(--bg3)', color: cat === c ? '#fff' : 'var(--text2)', border: `1px solid ${cat === c ? 'var(--accent)' : 'var(--border)'}`, transition: 'all .18s' }}>
+          <div key={c} onClick={() => setCat(c)} style={{ padding: '6px 16px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap', background: cat === c ? 'var(--accent)' : 'transparent', color: cat === c ? '#fff' : 'var(--text3)', border: `1px solid ${cat === c ? 'var(--accent)' : 'var(--border)'}`, transition: 'all .18s' }}>
             {c}
           </div>
         ))}
@@ -149,7 +152,7 @@ export default function ExploreClient() {
                   <div style={{ position: 'absolute', top: '9px', left: '9px', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(8px)', borderRadius: '20px', fontSize: '10px', fontWeight: '500', color: '#fff' }}>
                     <span className="live-dot" style={{ width: '5px', height: '5px' }} />live
                   </div>
-                  <div style={{ position: 'absolute', top: '9px', right: '9px', padding: '3px 8px', background: 'rgba(99,102,241,.25)', borderRadius: '20px', fontSize: '10px', fontWeight: '600', color: '#a5b4fc' }}>{r.type}</div>
+                  <div style={{ position: 'absolute', top: '9px', right: '9px', padding: '3px 8px', background: 'rgba(0,0,0,.5)', borderRadius: '20px', fontSize: '10px', fontWeight: '600', color: 'rgba(255,255,255,.8)' }}>{r.type}</div>
                 </div>
                 <div style={{ padding: '12px' }}>
                   <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '4px', color: 'var(--text1)' }}>{r.name}</div>
@@ -190,7 +193,7 @@ export default function ExploreClient() {
               <label style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text2)', display: 'block', marginBottom: '8px' }}>Type</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
                 {['text','voice','music','video','debate','pinterest'].map(t => (
-                  <div key={t} onClick={() => setForm(prev => ({ ...prev, type: t }))} style={{ padding: '9px', borderRadius: '9px', cursor: 'pointer', textAlign: 'center', background: form.type === t ? 'rgba(99,102,241,.12)' : 'var(--bg3)', border: `1px solid ${form.type === t ? 'rgba(99,102,241,.28)' : 'var(--border)'}`, fontSize: '12px', fontWeight: '500', color: form.type === t ? 'var(--accent2)' : 'var(--text2)', transition: 'all .18s' }}>
+                  <div key={t} onClick={() => setForm(prev => ({ ...prev, type: t }))} style={{ padding: '9px', borderRadius: '9px', cursor: 'pointer', textAlign: 'center', background: form.type === t ? 'rgba(225,48,108,.12)' : 'var(--bg3)', border: `1px solid ${form.type === t ? 'rgba(225,48,108,.35)' : 'var(--border)'}`, fontSize: '12px', fontWeight: '500', color: form.type === t ? 'var(--accent)' : 'var(--text2)', transition: 'all .18s' }}>
                     {t}
                   </div>
                 ))}
