@@ -41,10 +41,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-      setProfile(data)
+
+      // Only fetch profile once
+      if (!profile) {
+        const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+        setProfile(data)
+      }
+
       const { count: nc } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('read', false)
       setNotifCount(nc || 0)
+
+      if (channel) return // don't re-subscribe
       channel = supabase.channel(`notifs:${user.id}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => setNotifCount(p => p + 1))
         .subscribe()
