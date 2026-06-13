@@ -17,6 +17,7 @@ export default function RoomClient({ room, initialMessages, members, currentUser
   const [input, setInput] = useState('')
   const [joined, setJoined] = useState(isMember)
   const [sending, setSending] = useState(false)
+  const [showMembers, setShowMembers] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
   const router = useRouter()
@@ -84,50 +85,29 @@ export default function RoomClient({ room, initialMessages, members, currentUser
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
 
       {/* MAIN */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* Room header */}
-        <div style={{
-          padding: '14px 18px', borderBottom: '1px solid var(--border)',
-          background: 'var(--bg1)', flexShrink: 0,
-          display: 'flex', alignItems: 'center', gap: '12px'
-        }}>
-          <button
-            onClick={() => router.push('/explore')}
-            style={{
-              background: 'none', border: 'none', color: 'var(--text3)',
-              cursor: 'pointer', fontSize: '18px', padding: '0'
-            }}
-          >←</button>
-          <div style={{
-            width: '36px', height: '36px', borderRadius: '9px',
-            background: ROOM_COLORS[room.category] || 'var(--bg3)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '20px', flexShrink: 0
-          }}>{room.emoji}</div>
+        <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg1)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button onClick={() => router.push('/explore')} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '18px', padding: '0', minWidth: '36px', minHeight: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>←</button>
+          <div style={{ width: '34px', height: '34px', borderRadius: '9px', background: ROOM_COLORS[room.category] || 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{room.emoji}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: '600', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '7px' }}>
+            <div style={{ fontWeight: '600', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {room.name} <span className="live-dot" />
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text3)' }}>
-              {members.length} members · {room.type}
-            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{members.length} members</div>
           </div>
+          {/* Members toggle button */}
+          <button onClick={() => setShowMembers(s => !s)} style={{ background: showMembers ? 'var(--accentbg)' : 'none', border: `1px solid ${showMembers ? 'var(--accentbdr)' : 'var(--border)'}`, borderRadius: '8px', color: showMembers ? 'var(--accent2)' : 'var(--text3)', cursor: 'pointer', fontSize: '12px', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+            👥 {members.length}
+          </button>
           {!joined ? (
-            <button onClick={joinRoom} style={{
-              padding: '7px 16px', background: 'var(--accent)', border: 'none',
-              borderRadius: '8px', color: '#fff', fontSize: '13px',
-              fontWeight: '600', cursor: 'pointer'
-            }}>Join Room</button>
+            <button onClick={joinRoom} style={{ padding: '7px 14px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer', flexShrink: 0 }}>Join</button>
           ) : (
-            <div style={{
-              padding: '5px 12px', background: 'rgba(34,197,94,.1)',
-              border: '1px solid rgba(34,197,94,.2)', borderRadius: '8px',
-              fontSize: '12px', color: 'var(--green)', fontWeight: '500'
-            }}>✓ Joined</div>
+            <div style={{ padding: '5px 10px', background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.2)', borderRadius: '8px', fontSize: '12px', color: 'var(--green)', fontWeight: '500', flexShrink: 0 }}>✓</div>
           )}
         </div>
 
@@ -224,43 +204,31 @@ export default function RoomClient({ room, initialMessages, members, currentUser
         </div>
       </div>
 
-      {/* MEMBERS PANEL */}
-      <div style={{
-        width: '220px', borderLeft: '1px solid var(--border)',
-        background: 'var(--bg1)', overflow: 'hidden', flexShrink: 0
-      }}>
-        <div style={{ padding: '14px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-            Members · {members.length}
+      {/* MEMBERS PANEL — toggleable */}
+      {showMembers && (
+        <div style={{ width: '200px', borderLeft: '1px solid var(--border)', background: 'var(--bg1)', overflow: 'hidden', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Members · {members.length}</div>
+            <button onClick={() => setShowMembers(false)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '16px', padding: '0' }}>×</button>
+          </div>
+          <div style={{ padding: '8px', overflowY: 'auto', flex: 1 }}>
+            {members.map((m: any) => {
+              const mname = m.profiles?.name || 'Unknown'
+              const mcolor = getColor(mname)
+              return (
+                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '8px' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: mcolor, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: '#fff' }}>{mname.charAt(0).toUpperCase()}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mname}</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text3)' }}>{m.role}</div>
+                  </div>
+                  <span className="live-dot" style={{ width: '5px', height: '5px' }} />
+                </div>
+              )
+            })}
           </div>
         </div>
-        <div style={{ padding: '8px', overflowY: 'auto' }}>
-          {members.map((m: any) => {
-            const name = m.profiles?.name || 'Unknown'
-            const color = getColor(name)
-            return (
-              <div key={m.id} style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                padding: '6px 8px', borderRadius: '8px'
-              }}>
-                <div style={{
-                  width: '28px', height: '28px', borderRadius: '50%',
-                  background: color, flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '11px', fontWeight: '700', color: '#fff'
-                }}>
-                  {name.charAt(0).toUpperCase()}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text1)' }}>{name}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)' }}>{m.role}</div>
-                </div>
-                <span className="live-dot" style={{ width: '5px', height: '5px' }} />
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      )}
     </div>
   )
 }

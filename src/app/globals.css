@@ -24,18 +24,20 @@
   --border2: rgba(255,255,255,0.11);
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html { -webkit-text-size-adjust: 100%; }
 html, body { height: 100%; background: var(--bg0); color: var(--text1); font-family: 'Inter', sans-serif; }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg5); border-radius: 2px; }
 
 @keyframes fadeUp { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:translateY(0) } }
 @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.35 } }
 @keyframes glow { 0%,100% { box-shadow:0 0 18px rgba(99,102,241,.25) } 50% { box-shadow:0 0 36px rgba(99,102,241,.55) } }
 @keyframes spin { to { transform:rotate(360deg) } }
-@keyframes waveBar {
-  0%, 100% { height: 4px; }
-  50% { height: 16px; }
-}
+@keyframes waveBar { 0%, 100% { height: 4px; } 50% { height: 16px; } }
 
 .fade-up { animation: fadeUp .32s ease both; }
 .live-dot { display:inline-block; width:7px; height:7px; background:var(--green); border-radius:50%; animation:pulse 2s infinite; }
-.spinner { width:18px; height:18px; border:2px solid rgba(255,255,255,.2); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
+.spinner { width:18px; height:18px; border:2px solid rgba(255,255,255,.2); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; flex-shrink: 0; }
