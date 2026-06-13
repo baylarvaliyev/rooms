@@ -5,6 +5,7 @@ import RoomClient from './RoomClient'
 import DebateRoom from './DebateRoom'
 import PinterestRoom from './PinterestRoom'
 import VoiceRoom from './VoiceRoom'
+import VideoRoom from './VideoRoom'
 import MusicRoom from './MusicRoom'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -79,6 +80,10 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
 
   if (room.type === 'voice') {
     return <VoiceRoom room={room} members={members || []} currentUser={currentUser} isMember={isMember} />
+  }
+
+  if (room.type === 'video') {
+    return <VideoRoom room={room} members={members || []} currentUser={currentUser} isMember={isMember} />
   }
 
   if (room.type === 'music') {
