@@ -19,15 +19,14 @@ function timeAgo(date: string) {
 }
 
 const ACHIEVEMENT_META: Record<string, { icon: string, label: string, desc: string, color: string }> = {
-  first_post:     { icon: '✍️', label: 'First Post',      desc: 'Published your first post',        color: '#6366f1' },
-  prolific_poster:{ icon: '📝', label: 'Prolific Poster', desc: 'Published 10 posts',                color: '#0891b2' },
-  viral:          { icon: '🔥', label: 'Viral',           desc: 'Received 50 likes',                 color: '#ef4444' },
-  influencer:     { icon: '⭐', label: 'Influencer',      desc: 'Gained 10 followers',               color: '#eab308' },
-  room_explorer:  { icon: '🧭', label: 'Room Explorer',   desc: 'Joined 5 rooms',                    color: '#0f766e' },
-  rising_star:    { icon: '🌟', label: 'Rising Star',     desc: 'Reached 100 reputation',            color: '#f97316' },
-  elite:          { icon: '👑', label: 'Elite',           desc: 'Reached 1000 reputation',           color: '#a855f7' },
+  first_post:     { icon: '✍️', label: 'First Post',      desc: 'Published your first post',   color: '#6366f1' },
+  prolific_poster:{ icon: '📝', label: 'Prolific Poster', desc: 'Published 10 posts',           color: '#0891b2' },
+  viral:          { icon: '🔥', label: 'Viral',           desc: 'Received 50 likes',            color: '#ef4444' },
+  influencer:     { icon: '⭐', label: 'Influencer',      desc: 'Gained 10 followers',          color: '#eab308' },
+  room_explorer:  { icon: '🧭', label: 'Room Explorer',   desc: 'Joined 5 rooms',               color: '#0f766e' },
+  rising_star:    { icon: '🌟', label: 'Rising Star',     desc: 'Reached 100 reputation',       color: '#f97316' },
+  elite:          { icon: '👑', label: 'Elite',           desc: 'Reached 1000 reputation',      color: '#a855f7' },
 }
-
 const ALL_ACHIEVEMENTS = Object.keys(ACHIEVEMENT_META)
 
 const ROOM_COLORS: Record<string, string> = {
@@ -60,10 +59,16 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(profile?.name || '')
   const [bio, setBio] = useState(profile?.bio || '')
+  const [twitter, setTwitter] = useState(profile?.social_links?.twitter || '')
+  const [linkedin, setLinkedin] = useState(profile?.social_links?.linkedin || '')
+  const [website, setWebsite] = useState(profile?.social_links?.website || '')
   const [saving, setSaving] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || '')
+  const [coverUrl, setCoverUrl] = useState(profile?.cover_url || '')
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingCover, setUploadingCover] = useState(false)
+  const avatarRef = useRef<HTMLInputElement>(null)
+  const coverRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -80,9 +85,7 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
     setUploadingAvatar(true)
     const ext = file.name.split('.').pop()
     const path = `${profile.id}/avatar.${ext}`
-    const { data, error } = await supabase.storage
-      .from('avatars')
-      .upload(path, file, { cacheControl: '3600', upsert: true })
+    const { data, error } = await supabase.storage.from('avatars').upload(path, file, { cacheControl: '3600', upsert: true })
     if (!error && data) {
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
       const url = urlData.publicUrl + '?t=' + Date.now()
@@ -92,9 +95,29 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
     setUploadingAvatar(false)
   }
 
+  async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) { alert('Image must be under 10MB'); return }
+    setUploadingCover(true)
+    const ext = file.name.split('.').pop()
+    const path = `${profile.id}/cover.${ext}`
+    const { data, error } = await supabase.storage.from('avatars').upload(path, file, { cacheControl: '3600', upsert: true })
+    if (!error && data) {
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
+      const url = urlData.publicUrl + '?t=' + Date.now()
+      await supabase.from('profiles').update({ cover_url: url }).eq('id', profile.id)
+      setCoverUrl(url)
+    }
+    setUploadingCover(false)
+  }
+
   async function saveProfile() {
     setSaving(true)
-    await supabase.from('profiles').update({ name, bio }).eq('id', profile.id)
+    await supabase.from('profiles').update({
+      name, bio,
+      social_links: { twitter, linkedin, website }
+    }).eq('id', profile.id)
     setSaving(false)
     setEditing(false)
     router.refresh()
@@ -105,81 +128,95 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
       <div style={{ maxWidth: '700px', margin: '0 auto' }}>
 
         {/* Profile card */}
-        <div style={{
-          background: 'var(--bg2)', border: '1px solid var(--border)',
-          borderRadius: '16px', overflow: 'hidden', marginBottom: '16px'
-        }}>
-          {/* Cover */}
-          <div style={{
-            height: '140px',
-            background: `linear-gradient(135deg, ${color}44, ${color}11)`,
-            position: 'relative'
-          }}>
-            <button onClick={() => setEditing(!editing)} style={{
-              position: 'absolute', top: '12px', right: '12px',
-              padding: '6px 14px', background: 'rgba(0,0,0,.4)',
-              backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,.15)',
-              borderRadius: '8px', color: '#fff', fontSize: '12px',
-              cursor: 'pointer', fontWeight: '500'
-            }}>{editing ? 'Cancel' : '✏️ Edit profile'}</button>
+        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden', marginBottom: '16px' }}>
+
+          {/* Cover photo */}
+          <div style={{ height: '160px', position: 'relative', overflow: 'hidden', cursor: 'pointer' }}
+            onClick={() => coverRef.current?.click()}>
+            {coverUrl
+              ? <img src={coverUrl} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${color}55, ${color}22)` }} />
+            }
+            {/* Cover overlay */}
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity .2s' }}
+              onMouseOver={e => (e.currentTarget as HTMLElement).style.opacity = '1'}
+              onMouseOut={e => (e.currentTarget as HTMLElement).style.opacity = '0'}
+            >
+              <span style={{ color: '#fff', fontSize: '13px', fontWeight: '600', background: 'rgba(0,0,0,.5)', padding: '6px 14px', borderRadius: '8px' }}>
+                {uploadingCover ? 'Uploading…' : '📷 Change cover'}
+              </span>
+            </div>
+            <input ref={coverRef} type="file" accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} />
+
+            {/* Edit button */}
+            <button onClick={e => { e.stopPropagation(); setEditing(!editing) }} style={{ position: 'absolute', top: '12px', right: '12px', padding: '6px 14px', background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,.2)', borderRadius: '8px', color: '#fff', fontSize: '12px', cursor: 'pointer', fontWeight: '500' }}>
+              {editing ? 'Cancel' : '✏️ Edit profile'}
+            </button>
           </div>
 
           <div style={{ padding: '0 20px 20px', position: 'relative' }}>
             {/* Avatar */}
             <div style={{ position: 'relative', width: '76px', marginTop: '-38px', marginBottom: '12px' }}>
-              <div style={{
-                width: '76px', height: '76px', borderRadius: '50%',
-                background: avatarUrl ? 'none' : color,
-                border: '3px solid var(--bg2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '28px', fontWeight: '800', color: '#fff', overflow: 'hidden'
-              }}>
-                {avatarUrl
-                  ? <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : (profile?.name || 'U').charAt(0).toUpperCase()
-                }
+              <div style={{ width: '76px', height: '76px', borderRadius: '50%', background: avatarUrl ? 'none' : color, border: '3px solid var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: '800', color: '#fff', overflow: 'hidden' }}>
+                {avatarUrl ? <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (profile?.name || 'U').charAt(0).toUpperCase()}
               </div>
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                style={{
-                  position: 'absolute', bottom: 0, right: 0,
-                  width: '24px', height: '24px', borderRadius: '50%',
-                  background: 'var(--accent)', border: '2px solid var(--bg2)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', fontSize: '11px'
-                }}
-              >{uploadingAvatar ? '…' : '📷'}</div>
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} style={{ display: 'none' }} />
+              <div onClick={() => avatarRef.current?.click()} style={{ position: 'absolute', bottom: 0, right: 0, width: '24px', height: '24px', borderRadius: '50%', background: 'var(--accent)', border: '2px solid var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '11px' }}>
+                {uploadingAvatar ? '…' : '📷'}
+              </div>
+              <input ref={avatarRef} type="file" accept="image/*" onChange={handleAvatarUpload} style={{ display: 'none' }} />
             </div>
 
             {editing ? (
               <div>
-                <div style={{ marginBottom: '10px' }}>
-                  <label style={{ fontSize: '12px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>Name</label>
-                  <input value={name} onChange={e => setName(e.target.value)} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text1)', fontSize: '13px', outline: 'none' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>Name</label>
+                    <input value={name} onChange={e => setName(e.target.value)} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>Username</label>
+                    <input value={profile?.username} disabled style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text3)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
+                  </div>
                 </div>
-                <div style={{ marginBottom: '14px' }}>
+                <div style={{ marginBottom: '10px' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>Bio</label>
                   <textarea value={bio} onChange={e => setBio(e.target.value)} rows={2} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text1)', fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
                 </div>
+                <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '8px', fontWeight: '600' }}>Social links</div>
+                <div style={{ display: 'grid', gap: '8px', marginBottom: '14px' }}>
+                  {[
+                    { label: '𝕏 Twitter / X', value: twitter, set: setTwitter, placeholder: 'https://x.com/username' },
+                    { label: '💼 LinkedIn', value: linkedin, set: setLinkedin, placeholder: 'https://linkedin.com/in/username' },
+                    { label: '🌐 Website', value: website, set: setWebsite, placeholder: 'https://yoursite.com' },
+                  ].map(f => (
+                    <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text3)', width: '110px', flexShrink: 0 }}>{f.label}</span>
+                      <input value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.placeholder} style={{ flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 11px', color: 'var(--text1)', fontSize: '12px', outline: 'none', fontFamily: 'inherit' }} />
+                    </div>
+                  ))}
+                </div>
                 <button onClick={saveProfile} disabled={saving} style={{ padding: '8px 20px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {saving ? <><div className="spinner" />Saving…</> : 'Save changes'}
+                  {saving ? <><div className="spinner" />Saving…</> : '✓ Save changes'}
                 </button>
               </div>
             ) : (
               <>
                 <div style={{ fontWeight: '700', fontSize: '20px', marginBottom: '2px' }}>{profile?.name}</div>
                 <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '6px' }}>@{profile?.username}</div>
-                {profile?.bio && <div style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: '1.6', marginBottom: '12px' }}>{profile.bio}</div>}
+                {profile?.bio && <div style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: '1.6', marginBottom: '10px' }}>{profile.bio}</div>}
+
+                {/* Social links */}
+                {(twitter || linkedin || website) && (
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                    {twitter && <a href={twitter} target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', color: 'var(--accent2)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>𝕏 Twitter</a>}
+                    {linkedin && <a href={linkedin} target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', color: 'var(--accent2)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>💼 LinkedIn</a>}
+                    {website && <a href={website} target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', color: 'var(--accent2)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>🌐 Website</a>}
+                  </div>
+                )}
 
                 {/* Stats */}
-                <div style={{ display: 'flex', gap: '20px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                  {[
-                    [posts.length, 'Posts'],
-                    [rooms.length, 'Rooms'],
-                    [followersCount, 'Followers'],
-                    [followingCount, 'Following'],
-                  ].map(([v, l]) => (
+                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                  {[[posts.length, 'Posts'], [rooms.length, 'Rooms'], [followersCount, 'Followers'], [followingCount, 'Following']].map(([v, l]) => (
                     <div key={l as string}>
                       <div style={{ fontWeight: '700', fontSize: '17px' }}>{v}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{l}</div>
@@ -192,75 +229,47 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
         </div>
 
         {/* Reputation card */}
-        <div style={{
-          background: 'var(--bg2)', border: '1px solid var(--border)',
-          borderRadius: '13px', padding: '16px', marginBottom: '16px'
-        }}>
+        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '13px', padding: '16px', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
             <div>
               <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text1)', display: 'flex', alignItems: 'center', gap: '7px' }}>
                 ⭐ Reputation
-                <span style={{
-                  fontSize: '11px', padding: '2px 8px', borderRadius: '20px',
-                  background: 'var(--accentbg, rgba(99,102,241,.1))',
-                  color: 'var(--accent2)', fontWeight: '500'
-                }}>Level {level} · {title}</span>
+                <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '20px', background: 'rgba(99,102,241,.1)', color: 'var(--accent2)', fontWeight: '500' }}>Level {level} · {title}</span>
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
                 {next ? `${rep} / ${next} pts to Level ${level + 1}` : 'Max level reached! 👑'}
               </div>
             </div>
-            <div style={{ fontWeight: '800', fontSize: '22px', color: 'var(--accent2)' }}>
-              {rep.toLocaleString()} pts
-            </div>
+            <div style={{ fontWeight: '800', fontSize: '22px', color: 'var(--accent2)' }}>{rep.toLocaleString()} pts</div>
           </div>
           <div style={{ height: '6px', background: 'var(--bg5, #242a38)', borderRadius: '3px', overflow: 'hidden' }}>
-            <div style={{
-              height: '100%', borderRadius: '3px',
-              background: 'linear-gradient(90deg, var(--accent), var(--purple, #a855f7))',
-              width: `${progress}%`, transition: 'width 1s ease'
-            }} />
+            <div style={{ height: '100%', borderRadius: '3px', background: 'linear-gradient(90deg, var(--accent), #a855f7)', width: `${progress}%`, transition: 'width 1s ease' }} />
           </div>
-          <div style={{ display: 'flex', gap: '16px', marginTop: '10px', fontSize: '12px', color: 'var(--text3)' }}>
-            <span>+2 pts per post</span>
-            <span>+5 pts per like received</span>
-            <span>+3 pts per comment received</span>
-            <span>+10 pts per follower</span>
+          <div style={{ display: 'flex', gap: '16px', marginTop: '10px', fontSize: '11px', color: 'var(--text3)', flexWrap: 'wrap' }}>
+            <span>+2 per post</span><span>+5 per like</span><span>+3 per comment</span><span>+10 per follower</span>
           </div>
         </div>
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: '2px', borderBottom: '1px solid var(--border)', marginBottom: '18px' }}>
           {(['posts', 'rooms', 'achievements'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{
-              padding: '9px 18px', border: 'none', background: 'none',
-              color: tab === t ? 'var(--accent2)' : 'var(--text3)',
-              borderBottom: `2px solid ${tab === t ? 'var(--accent)' : 'transparent'}`,
-              fontSize: '13px', fontWeight: '500', cursor: 'pointer',
-              marginBottom: '-1px', transition: 'all .18s', fontFamily: 'inherit'
-            }}>{t.charAt(0).toUpperCase() + t.slice(1)}</button>
+            <button key={t} onClick={() => setTab(t)} style={{ padding: '9px 18px', border: 'none', background: 'none', color: tab === t ? 'var(--accent2)' : 'var(--text3)', borderBottom: `2px solid ${tab === t ? 'var(--accent)' : 'transparent'}`, fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '-1px', transition: 'all .18s', fontFamily: 'inherit' }}>
+              {t.charAt(0).toUpperCase() + t.slice(1)}
+            </button>
           ))}
         </div>
 
         {/* Posts tab */}
-        {tab === 'posts' && (
-          posts.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text3)' }}>
-              <div style={{ fontSize: '32px', marginBottom: '10px' }}>✍️</div>
-              <div style={{ fontSize: '14px', color: 'var(--text2)' }}>No posts yet</div>
-            </div>
-          ) : posts.map((post: any) => (
+        {tab === 'posts' && (posts.length === 0
+          ? <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text3)' }}><div style={{ fontSize: '32px', marginBottom: '10px' }}>✍️</div><div style={{ fontSize: '14px' }}>No posts yet</div></div>
+          : posts.map((post: any) => (
             <div key={post.id} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                 {post.rooms && <span style={{ fontSize: '12px', color: 'var(--accent2)' }}>{post.rooms.emoji} {post.rooms.name}</span>}
                 <span style={{ fontSize: '11px', color: 'var(--text3)' }}>· {timeAgo(post.created_at)}</span>
               </div>
-              <div style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: '1.65', whiteSpace: 'pre-wrap', marginBottom: post.media_url ? '10px' : '0' }}>
-                {post.content}
-              </div>
-              {post.media_url && (
-                <img src={post.media_url} alt="" style={{ width: '100%', maxHeight: '300px', objectFit: 'cover', borderRadius: '8px', display: 'block' }} />
-              )}
+              <div style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: '1.65', whiteSpace: 'pre-wrap', marginBottom: post.media_url ? '10px' : '0' }}>{post.content}</div>
+              {post.media_url && <img src={post.media_url} alt="" style={{ width: '100%', maxHeight: '300px', objectFit: 'cover', borderRadius: '8px', display: 'block' }} />}
               <div style={{ display: 'flex', gap: '14px', marginTop: '10px' }}>
                 <span style={{ fontSize: '12px', color: 'var(--text3)' }}>❤️ {post.like_count}</span>
                 <span style={{ fontSize: '12px', color: 'var(--text3)' }}>💬 {post.comment_count}</span>
@@ -270,15 +279,13 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
         )}
 
         {/* Rooms tab */}
-        {tab === 'rooms' && (
-          rooms.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text3)' }}>
+        {tab === 'rooms' && (rooms.length === 0
+          ? <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text3)' }}>
               <div style={{ fontSize: '32px', marginBottom: '10px' }}>🚪</div>
-              <div style={{ fontSize: '14px', color: 'var(--text2)' }}>No rooms joined yet</div>
+              <div style={{ fontSize: '14px' }}>No rooms joined yet</div>
               <button onClick={() => router.push('/explore')} style={{ marginTop: '12px', padding: '8px 18px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', cursor: 'pointer' }}>Explore Rooms</button>
             </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
+          : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
               {rooms.map((m: any) => {
                 const r = m.rooms
                 if (!r) return null
@@ -296,33 +303,22 @@ export default function ProfileClient({ profile, posts, rooms, followersCount, f
                 )
               })}
             </div>
-          )
         )}
 
         {/* Achievements tab */}
         {tab === 'achievements' && (
           <div>
-            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '14px' }}>
-              {earnedTypes.size} of {ALL_ACHIEVEMENTS.length} achievements earned
-            </div>
+            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '14px' }}>{earnedTypes.size} of {ALL_ACHIEVEMENTS.length} earned</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
               {ALL_ACHIEVEMENTS.map(type => {
                 const meta = ACHIEVEMENT_META[type]
                 const earned = earnedTypes.has(type)
                 return (
-                  <div key={type} style={{
-                    background: earned ? `${meta.color}11` : 'var(--bg2)',
-                    border: `1px solid ${earned ? meta.color + '44' : 'var(--border)'}`,
-                    borderRadius: '12px', padding: '14px',
-                    opacity: earned ? 1 : 0.45,
-                    transition: 'all .2s'
-                  }}>
+                  <div key={type} style={{ background: earned ? `${meta.color}11` : 'var(--bg2)', border: `1px solid ${earned ? meta.color + '44' : 'var(--border)'}`, borderRadius: '12px', padding: '14px', opacity: earned ? 1 : 0.45 }}>
                     <div style={{ fontSize: '28px', marginBottom: '8px' }}>{meta.icon}</div>
                     <div style={{ fontSize: '13px', fontWeight: '600', color: earned ? 'var(--text1)' : 'var(--text2)', marginBottom: '3px' }}>{meta.label}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{meta.desc}</div>
-                    {earned && (
-                      <div style={{ fontSize: '10px', color: meta.color, marginTop: '6px', fontWeight: '600' }}>✓ Earned</div>
-                    )}
+                    {earned && <div style={{ fontSize: '10px', color: meta.color, marginTop: '6px', fontWeight: '600' }}>✓ Earned</div>}
                   </div>
                 )
               })}

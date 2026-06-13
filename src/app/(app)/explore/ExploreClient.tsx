@@ -19,11 +19,11 @@ const ROOM_COLORS: Record<string, string> = {
   Lifestyle: 'linear-gradient(135deg,#0a0a2a,#1a1a4e)',
 }
 
-export default function ExploreClient({ rooms }: { rooms: any[] }) {
+export default function ExploreClient({ rooms, trendingRooms }: { rooms: any[], trendingRooms?: any[] }) {
   const [cat, setCat] = useState('All')
   const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
-  const [form, setForm] = useState({ name:'', description:'', category:'Business', type:'text', emoji:'💬' })
+  const [form, setForm] = useState({ name: '', description: '', category: 'Business', type: 'text', emoji: '💬' })
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
@@ -38,9 +38,7 @@ export default function ExploreClient({ rooms }: { rooms: any[] }) {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const { data, error } = await supabase.from('rooms').insert({
-      ...form, created_by: user.id
-    }).select().single()
+    const { data, error } = await supabase.from('rooms').insert({ ...form, created_by: user.id }).select().single()
     if (!error && data) {
       await supabase.from('room_members').insert({ room_id: data.id, user_id: user.id, role: 'owner' })
       setCreating(false)
@@ -53,52 +51,53 @@ export default function ExploreClient({ rooms }: { rooms: any[] }) {
     <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
       {/* Topbar */}
-      <div style={{
-        padding: '14px 20px', borderBottom: '1px solid var(--border)',
-        display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0,
-        background: 'var(--bg1)'
-      }}>
-        <input
-          value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search rooms…"
-          style={{
-            flex: 1, maxWidth: '360px', background: 'var(--bg3)',
-            border: '1px solid var(--border)', borderRadius: '9px',
-            padding: '8px 14px', color: 'var(--text1)', fontSize: '13px', outline: 'none'
-          }}
-        />
-        <button
-          onClick={() => setCreating(true)}
-          style={{
-            padding: '8px 16px', background: 'var(--accent)', border: 'none',
-            borderRadius: '9px', color: '#fff', fontSize: '13px',
-            fontWeight: '600', cursor: 'pointer'
-          }}
-        >+ New Room</button>
+      <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0, background: 'var(--bg1)' }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search rooms…" style={{ flex: 1, maxWidth: '360px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '9px', padding: '8px 14px', color: 'var(--text1)', fontSize: '13px', outline: 'none' }} />
+        <button onClick={() => setCreating(true)} style={{ padding: '8px 16px', background: 'var(--accent)', border: 'none', borderRadius: '9px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>+ New Room</button>
       </div>
 
       {/* Categories */}
-      <div style={{
-        display: 'flex', gap: '8px', padding: '12px 20px',
-        overflowX: 'auto', flexShrink: 0, borderBottom: '1px solid var(--border)'
-      }}>
+      <div style={{ display: 'flex', gap: '8px', padding: '12px 20px', overflowX: 'auto', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
         {CATEGORIES.map(c => (
-          <div
-            key={c} onClick={() => setCat(c)}
-            style={{
-              padding: '6px 14px', borderRadius: '20px', cursor: 'pointer',
-              fontSize: '12px', fontWeight: '500', whiteSpace: 'nowrap',
-              background: cat === c ? 'var(--accent)' : 'var(--bg3)',
-              color: cat === c ? '#fff' : 'var(--text2)',
-              border: `1px solid ${cat === c ? 'var(--accent)' : 'var(--border)'}`,
-              transition: 'all .18s'
-            }}
-          >{c}</div>
+          <div key={c} onClick={() => setCat(c)} style={{ padding: '6px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: '500', whiteSpace: 'nowrap', background: cat === c ? 'var(--accent)' : 'var(--bg3)', color: cat === c ? '#fff' : 'var(--text2)', border: `1px solid ${cat === c ? 'var(--accent)' : 'var(--border)'}`, transition: 'all .18s' }}>
+            {c}
+          </div>
         ))}
       </div>
 
-      {/* Grid */}
+      {/* Scrollable content */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+
+        {/* Trending */}
+        {trendingRooms && trendingRooms.length > 0 && cat === 'All' && !search && (
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: '12px' }}>🔥 Trending this week</div>
+            <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '6px' }}>
+              {trendingRooms.map(r => (
+                <div key={r.id} onClick={() => router.push(`/rooms/${r.id}`)} style={{ flexShrink: 0, width: '160px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden', cursor: 'pointer', transition: 'all .2s' }}
+                  onMouseOver={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.15)'}
+                  onMouseOut={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.06)'}
+                >
+                  <div style={{ height: '70px', background: ROOM_COLORS[r.category] || 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', position: 'relative' }}>
+                    {r.emoji}
+                    {r.trending_score > 0 && <div style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(239,68,68,.8)', borderRadius: '4px', padding: '2px 5px', fontSize: '9px', fontWeight: '700', color: '#fff' }}>🔥 HOT</div>}
+                  </div>
+                  <div style={{ padding: '8px 10px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{r.member_count || 0} members</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Label */}
+        <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: '12px' }}>
+          {cat === 'All' && !search ? 'All Rooms' : `${filtered.length} result${filtered.length !== 1 ? 's' : ''}`}
+        </div>
+
+        {/* Grid */}
         {filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text3)' }}>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔍</div>
@@ -106,63 +105,22 @@ export default function ExploreClient({ rooms }: { rooms: any[] }) {
             <div style={{ fontSize: '13px' }}>Be the first to create one!</div>
           </div>
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-            gap: '13px'
-          }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '13px' }}>
             {filtered.map((r, i) => (
-              <div
-                key={r.id}
-                onClick={() => router.push(`/rooms/${r.id}`)}
-                className="fade-up"
-                style={{
-                  background: 'var(--bg2)', border: '1px solid var(--border)',
-                  borderRadius: '13px', overflow: 'hidden', cursor: 'pointer',
-                  transition: 'all .2s', animationDelay: `${i * 0.04}s`
-                }}
-                onMouseOver={e => {
-                  (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.11)'
-                  ;(e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'
-                }}
-                onMouseOut={e => {
-                  (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.06)'
-                  ;(e.currentTarget as HTMLElement).style.transform = 'none'
-                }}
+              <div key={r.id} onClick={() => router.push(`/rooms/${r.id}`)} className="fade-up" style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '13px', overflow: 'hidden', cursor: 'pointer', transition: 'all .2s', animationDelay: `${i * 0.04}s` }}
+                onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.11)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
+                onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.06)'; (e.currentTarget as HTMLElement).style.transform = 'none' }}
               >
-                {/* Cover */}
-                <div style={{
-                  height: '110px',
-                  background: ROOM_COLORS[r.category] || 'linear-gradient(135deg,#1a1a4e,#312a7e)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '48px', position: 'relative'
-                }}>
+                <div style={{ height: '110px', background: ROOM_COLORS[r.category] || 'linear-gradient(135deg,#1a1a4e,#312a7e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '48px', position: 'relative' }}>
                   {r.emoji}
-                  <div style={{
-                    position: 'absolute', top: '9px', left: '9px',
-                    display: 'flex', alignItems: 'center', gap: '4px',
-                    padding: '3px 8px', background: 'rgba(0,0,0,.55)',
-                    backdropFilter: 'blur(8px)', borderRadius: '20px',
-                    fontSize: '10px', fontWeight: '500', color: '#fff'
-                  }}>
-                    <span className="live-dot" style={{ width: '5px', height: '5px' }} />
-                    {r.online_count || 0} live
+                  <div style={{ position: 'absolute', top: '9px', left: '9px', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(8px)', borderRadius: '20px', fontSize: '10px', fontWeight: '500', color: '#fff' }}>
+                    <span className="live-dot" style={{ width: '5px', height: '5px' }} />{r.online_count || 0} live
                   </div>
-                  <div style={{
-                    position: 'absolute', top: '9px', right: '9px',
-                    padding: '3px 8px', background: 'rgba(99,102,241,.25)',
-                    borderRadius: '20px', fontSize: '10px', fontWeight: '600',
-                    color: '#a5b4fc'
-                  }}>{r.type}</div>
+                  <div style={{ position: 'absolute', top: '9px', right: '9px', padding: '3px 8px', background: 'rgba(99,102,241,.25)', borderRadius: '20px', fontSize: '10px', fontWeight: '600', color: '#a5b4fc' }}>{r.type}</div>
                 </div>
-                {/* Info */}
                 <div style={{ padding: '12px' }}>
                   <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '4px', color: 'var(--text1)' }}>{r.name}</div>
-                  <div style={{
-                    fontSize: '12px', color: 'var(--text3)', marginBottom: '10px',
-                    display: '-webkit-box', WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical', overflow: 'hidden'
-                  }}>{r.description}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.description}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ fontSize: '12px', color: 'var(--text3)' }}>👥 {r.member_count || 0}</span>
                     <span style={{ fontSize: '12px', color: 'var(--text3)' }}>{r.category}</span>
@@ -176,17 +134,9 @@ export default function ExploreClient({ rooms }: { rooms: any[] }) {
 
       {/* Create Room Modal */}
       {creating && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)',
-          backdropFilter: 'blur(8px)', zIndex: 900,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
-        }} onClick={e => e.target === e.currentTarget && setCreating(false)}>
-          <div style={{
-            background: 'var(--bg2)', border: '1px solid var(--border2)',
-            borderRadius: '20px', padding: '28px', width: '100%', maxWidth: '460px'
-          }} className="fade-up">
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(8px)', zIndex: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={e => e.target === e.currentTarget && setCreating(false)}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '20px', padding: '28px', width: '100%', maxWidth: '460px' }} className="fade-up">
             <div style={{ fontWeight: '700', fontSize: '18px', marginBottom: '20px' }}>Create a Room</div>
-
             {[
               { label: 'Room name', key: 'name', placeholder: 'e.g. Baku Entrepreneurs' },
               { label: 'Description', key: 'description', placeholder: 'What is this room about?' },
@@ -194,66 +144,28 @@ export default function ExploreClient({ rooms }: { rooms: any[] }) {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: '14px' }}>
                 <label style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text2)', display: 'block', marginBottom: '5px' }}>{f.label}</label>
-                <input
-                  value={(form as any)[f.key]}
-                  onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  placeholder={f.placeholder}
-                  style={{
-                    width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)',
-                    borderRadius: '9px', padding: '9px 13px', color: 'var(--text1)',
-                    fontSize: '13px', outline: 'none'
-                  }}
-                />
+                <input value={(form as any)[f.key]} onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '9px', padding: '9px 13px', color: 'var(--text1)', fontSize: '13px', outline: 'none' }} />
               </div>
             ))}
-
             <div style={{ marginBottom: '14px' }}>
               <label style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text2)', display: 'block', marginBottom: '5px' }}>Category</label>
-              <select
-                value={form.category}
-                onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))}
-                style={{
-                  width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)',
-                  borderRadius: '9px', padding: '9px 13px', color: 'var(--text1)',
-                  fontSize: '13px', outline: 'none'
-                }}
-              >
+              <select value={form.category} onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '9px', padding: '9px 13px', color: 'var(--text1)', fontSize: '13px', outline: 'none' }}>
                 {CATEGORIES.filter(c => c !== 'All').map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
-
             <div style={{ marginBottom: '20px' }}>
               <label style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text2)', display: 'block', marginBottom: '8px' }}>Type</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
                 {['text','voice','music','video','debate','pinterest'].map(t => (
-                  <div
-                    key={t} onClick={() => setForm(prev => ({ ...prev, type: t }))}
-                    style={{
-                      padding: '9px', borderRadius: '9px', cursor: 'pointer', textAlign: 'center',
-                      background: form.type === t ? 'rgba(99,102,241,.12)' : 'var(--bg3)',
-                      border: `1px solid ${form.type === t ? 'rgba(99,102,241,.28)' : 'var(--border)'}`,
-                      fontSize: '12px', fontWeight: '500',
-                      color: form.type === t ? 'var(--accent2)' : 'var(--text2)',
-                      transition: 'all .18s'
-                    }}
-                  >{t}</div>
+                  <div key={t} onClick={() => setForm(prev => ({ ...prev, type: t }))} style={{ padding: '9px', borderRadius: '9px', cursor: 'pointer', textAlign: 'center', background: form.type === t ? 'rgba(99,102,241,.12)' : 'var(--bg3)', border: `1px solid ${form.type === t ? 'rgba(99,102,241,.28)' : 'var(--border)'}`, fontSize: '12px', fontWeight: '500', color: form.type === t ? 'var(--accent2)' : 'var(--text2)', transition: 'all .18s' }}>
+                    {t}
+                  </div>
                 ))}
               </div>
             </div>
-
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => setCreating(false)} style={{
-                flex: 1, padding: '10px', background: 'transparent',
-                border: '1px solid var(--border)', borderRadius: '9px',
-                color: 'var(--text2)', cursor: 'pointer', fontSize: '13px'
-              }}>Cancel</button>
-              <button onClick={createRoom} disabled={!form.name.trim() || loading} style={{
-                flex: 2, padding: '10px', background: 'var(--accent)',
-                border: 'none', borderRadius: '9px', color: '#fff',
-                cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-                opacity: !form.name.trim() || loading ? .6 : 1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-              }}>
+              <button onClick={() => setCreating(false)} style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '9px', color: 'var(--text2)', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
+              <button onClick={createRoom} disabled={!form.name.trim() || loading} style={{ flex: 2, padding: '10px', background: 'var(--accent)', border: 'none', borderRadius: '9px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '600', opacity: !form.name.trim() || loading ? .6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                 {loading ? <><div className="spinner" />Creating…</> : '🚀 Create Room'}
               </button>
             </div>
