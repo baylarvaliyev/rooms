@@ -65,6 +65,8 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
   const [tab, setTab] = useState<'posts' | 'rooms' | 'achievements'>('posts')
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(profile?.name || '')
+  const [username, setUsername] = useState(profile?.username || '')
+  const [usernameError, setUsernameError] = useState('')
   const [bio, setBio] = useState(profile?.bio || '')
   const [twitter, setTwitter] = useState(profile?.social_links?.twitter || '')
   const [linkedin, setLinkedin] = useState(profile?.social_links?.linkedin || '')
@@ -184,10 +186,27 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
 
   async function saveProfile() {
     setSaving(true)
+    setUsernameError('')
+    const cleanUsername = username.toLowerCase().replace(/[^a-z0-9_]/g, '')
+
+    // Check username availability if changed
+    if (cleanUsername !== profile.username) {
+      const { data: existing } = await supabase.from('profiles').select('id').eq('username', cleanUsername).neq('id', profile.id).single()
+      if (existing) {
+        setUsernameError('Username already taken — choose another')
+        setSaving(false)
+        return
+      }
+    }
+
     await supabase.from('profiles').update({
-      name, bio,
+      name,
+      username: cleanUsername,
+      bio,
       social_links: { twitter, linkedin, website }
     }).eq('id', profile.id)
+
+    setProfile((p: any) => ({ ...p, name, username: cleanUsername, bio }))
     setSaving(false)
     setEditing(false)
     router.refresh()
@@ -245,7 +264,8 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
                   </div>
                   <div>
                     <label style={{ fontSize: '12px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>Username</label>
-                    <input value={profile?.username} disabled style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text3)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
+                    <input value={username} onChange={e => { setUsername(e.target.value); setUsernameError('') }} placeholder="yourhandle" style={{ width: '100%', background: 'var(--bg3)', border: `1px solid ${usernameError ? 'var(--red)' : 'var(--border)'}`, borderRadius: '8px', padding: '8px 12px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
+                    {usernameError && <div style={{ fontSize: '11px', color: 'var(--red)', marginTop: '3px' }}>{usernameError}</div>}
                   </div>
                 </div>
                 <div style={{ marginBottom: '10px' }}>
