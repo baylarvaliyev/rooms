@@ -129,6 +129,29 @@ export default function SettingsPage() {
                 <ToggleSwitch on={(settings as any)[item.key]} onToggle={() => toggle(item.key)} />
               </div>
             ))}
+            {/* Enable push notifications button */}
+            <div style={{ padding: '13px 16px', borderTop: '1px solid var(--border)' }}>
+              <button onClick={async () => {
+                const permission = await Notification.requestPermission()
+                if (permission === 'granted') {
+                  const reg = await navigator.serviceWorker.ready
+                  const sub = await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+                  })
+                  await fetch('/api/push', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'subscribe', subscription: sub.toJSON() })
+                  })
+                  alert('🔔 Push notifications enabled!')
+                } else {
+                  alert('Notification permission denied. Please enable in browser settings.')
+                }
+              }} style={{ width: '100%', padding: '9px', background: 'rgba(225,48,108,.08)', border: '1px solid rgba(225,48,108,.2)', borderRadius: '9px', color: 'var(--accent)', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
+                🔔 Enable Push Notifications
+              </button>
+            </div>
           </div>
         </div>
 
