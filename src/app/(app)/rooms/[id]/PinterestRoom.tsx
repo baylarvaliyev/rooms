@@ -202,81 +202,80 @@ export default function PinterestRoom({ room, currentUser, isMember }: any) {
         </div>
       )}
 
-      {/* Pin detail modal */}
+      {/* Pin detail modal — bottom sheet on mobile, side panel on desktop */}
       {openPin && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.9)', backdropFilter: 'blur(12px)', zIndex: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(12px)', zIndex: 900, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
           onClick={e => e.target === e.currentTarget && setOpenPin(null)}>
-          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '20px', overflow: 'hidden', width: '100%', maxWidth: '860px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} className="fade-up">
 
-            {/* Close */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: getColor(openPin.profiles?.name || 'U'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: '#fff' }}>
-                  {(openPin.profiles?.name || 'U').charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: '600' }}>{openPin.profiles?.name}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{timeAgo(openPin.created_at)}</div>
-                </div>
+          {/* Sheet */}
+          <div style={{ background: 'var(--bg2)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: '680px', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} className="fade-up">
+
+            {/* Drag handle */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+              <div style={{ width: '36px', height: '4px', borderRadius: '2px', background: 'var(--bg5, #333)' }} />
+            </div>
+
+            {/* Author + close */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 16px 10px', flexShrink: 0 }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: getColor(openPin.profiles?.name || 'U'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: '#fff', flexShrink: 0 }}>
+                {(openPin.profiles?.name || 'U').charAt(0).toUpperCase()}
               </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                {openPin.user_id === currentUser.id && (
-                  <button onClick={() => deletePin(openPin.id)} style={{ padding: '5px 12px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '8px', color: 'var(--red)', fontSize: '12px', cursor: 'pointer' }}>Delete</button>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text1)' }}>{openPin.profiles?.name}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{timeAgo(openPin.created_at)}</div>
+              </div>
+              {openPin.user_id === currentUser.id && (
+                <button onClick={() => deletePin(openPin.id)} style={{ padding: '5px 12px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '8px', color: 'var(--red)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>Delete</button>
+              )}
+              <button onClick={() => setOpenPin(null)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '22px', lineHeight: 1, padding: '4px', flexShrink: 0 }}>×</button>
+            </div>
+
+            {/* Scrollable content */}
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+
+              {/* Image — full width */}
+              <div style={{ background: '#000', width: '100%' }}>
+                <img src={openPin.image_url} alt={openPin.caption || 'Pin'} style={{ width: '100%', maxHeight: '55vw', objectFit: 'contain', display: 'block' }} />
+              </div>
+
+              {/* Caption */}
+              {openPin.caption && (
+                <div style={{ padding: '12px 16px', fontSize: '14px', color: 'var(--text1)', lineHeight: '1.5', borderBottom: '1px solid var(--border)' }}>{openPin.caption}</div>
+              )}
+
+              {/* Like + Save */}
+              <div style={{ padding: '12px 16px', display: 'flex', gap: '10px', borderBottom: '1px solid var(--border)' }}>
+                <button onClick={() => toggleLike(openPin.id)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: `1px solid ${likedPins.has(openPin.id) ? 'rgba(239,68,68,.3)' : 'var(--border)'}`, background: likedPins.has(openPin.id) ? 'rgba(239,68,68,.1)' : 'var(--bg3)', color: likedPins.has(openPin.id) ? 'var(--red)' : 'var(--text2)', cursor: 'pointer', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontFamily: 'inherit' }}>
+                  {likedPins.has(openPin.id) ? '❤️' : '🤍'} {openPin.likes || 0}
+                </button>
+                <button onClick={() => toggleSave(openPin.id)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: `1px solid ${savedPins.has(openPin.id) ? 'rgba(234,179,8,.3)' : 'var(--border)'}`, background: savedPins.has(openPin.id) ? 'rgba(234,179,8,.08)' : 'var(--bg3)', color: savedPins.has(openPin.id) ? 'var(--yellow)' : 'var(--text2)', cursor: 'pointer', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontFamily: 'inherit' }}>
+                  🔖 {savedPins.has(openPin.id) ? 'Saved' : 'Save'}
+                </button>
+              </div>
+
+              {/* Comments */}
+              <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {(pinComments[openPin.id] || []).length === 0 && (
+                  <div style={{ fontSize: '13px', color: 'var(--text3)', textAlign: 'center', padding: '16px 0' }}>No comments yet. Be first!</div>
                 )}
-                <button onClick={() => setOpenPin(null)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '22px', lineHeight: 1, padding: '4px' }}>×</button>
+                {(pinComments[openPin.id] || []).map((c: any) => (
+                  <div key={c.id} style={{ display: 'flex', gap: '10px' }}>
+                    <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: getColor(c.profiles?.name || 'U'), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: '#fff' }}>
+                      {(c.profiles?.name || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ fontSize: '13px', color: 'var(--text1)', lineHeight: '1.5' }}>
+                      <span style={{ fontWeight: '600', marginRight: '6px' }}>{c.profiles?.name}</span>
+                      {c.content}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Body */}
-            <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
-
-              {/* Image */}
-              <div style={{ flex: 1, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                <img src={openPin.image_url} alt={openPin.caption || 'Pin'} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
-              </div>
-
-              {/* Sidebar */}
-              <div style={{ width: '300px', flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--border)' }}>
-
-                {/* Caption */}
-                {openPin.caption && (
-                  <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', fontSize: '14px', color: 'var(--text1)', lineHeight: '1.5' }}>{openPin.caption}</div>
-                )}
-
-                {/* Like + Save actions */}
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '8px' }}>
-                  <button onClick={() => toggleLike(openPin.id)} style={{ flex: 1, padding: '8px', borderRadius: '9px', border: `1px solid ${likedPins.has(openPin.id) ? 'rgba(239,68,68,.3)' : 'var(--border)'}`, background: likedPins.has(openPin.id) ? 'rgba(239,68,68,.1)' : 'var(--bg3)', color: likedPins.has(openPin.id) ? 'var(--red)' : 'var(--text2)', cursor: 'pointer', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', fontFamily: 'inherit' }}>
-                    {likedPins.has(openPin.id) ? '❤️' : '🤍'} {openPin.likes || 0}
-                  </button>
-                  <button onClick={() => toggleSave(openPin.id)} style={{ flex: 1, padding: '8px', borderRadius: '9px', border: `1px solid ${savedPins.has(openPin.id) ? 'rgba(234,179,8,.3)' : 'var(--border)'}`, background: savedPins.has(openPin.id) ? 'rgba(234,179,8,.08)' : 'var(--bg3)', color: savedPins.has(openPin.id) ? 'var(--yellow)' : 'var(--text2)', cursor: 'pointer', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', fontFamily: 'inherit' }}>
-                    🔖 {savedPins.has(openPin.id) ? 'Saved' : 'Save'}
-                  </button>
-                </div>
-
-                {/* Comments */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {(pinComments[openPin.id] || []).length === 0 && (
-                    <div style={{ fontSize: '12px', color: 'var(--text3)', textAlign: 'center', padding: '20px 0' }}>No comments yet</div>
-                  )}
-                  {(pinComments[openPin.id] || []).map((c: any) => (
-                    <div key={c.id} style={{ display: 'flex', gap: '8px' }}>
-                      <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: getColor(c.profiles?.name || 'U'), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff' }}>
-                        {(c.profiles?.name || 'U').charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text1)', marginRight: '5px' }}>{c.profiles?.name}</span>
-                        <span style={{ fontSize: '13px', color: 'var(--text2)' }}>{c.content}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Comment input */}
-                <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', display: 'flex', gap: '7px', flexShrink: 0 }}>
-                  <input value={commentInput} onChange={e => setCommentInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && postComment(openPin.id)} placeholder="Add a comment…" style={{ flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '20px', padding: '7px 13px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
-                  <button onClick={() => postComment(openPin.id)} disabled={!commentInput.trim()} style={{ padding: '7px 13px', background: 'var(--accent)', border: 'none', borderRadius: '20px', color: '#fff', fontSize: '12px', cursor: 'pointer', opacity: !commentInput.trim() ? .5 : 1, fontFamily: 'inherit' }}>Post</button>
-                </div>
-              </div>
+            {/* Comment input — pinned to bottom */}
+            <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px', flexShrink: 0, background: 'var(--bg2)', paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}>
+              <input value={commentInput} onChange={e => setCommentInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && postComment(openPin.id)} placeholder="Add a comment…" style={{ flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '24px', padding: '9px 16px', color: 'var(--text1)', fontSize: '14px', outline: 'none', fontFamily: 'inherit' }} />
+              <button onClick={() => postComment(openPin.id)} disabled={!commentInput.trim()} style={{ padding: '9px 16px', background: 'var(--accent)', border: 'none', borderRadius: '24px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: !commentInput.trim() ? .5 : 1, fontFamily: 'inherit' }}>Post</button>
             </div>
           </div>
         </div>
