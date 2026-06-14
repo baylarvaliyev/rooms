@@ -63,6 +63,7 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
     const [
       { data: profileData },
       { data: joinedRooms },
+      { data: followedRoomRows },
       { data: following },
       { data: likes },
       { data: savedData },
@@ -70,6 +71,7 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
     ] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).single(),
       supabase.from('room_members').select('room_id').eq('user_id', user.id),
+      supabase.from('room_follows').select('room_id').eq('user_id', user.id),
       supabase.from('follows').select('following_id').eq('follower_id', user.id),
       supabase.from('likes').select('post_id').eq('user_id', user.id),
       supabase.from('saved_posts').select('post_id').eq('user_id', user.id),
@@ -82,26 +84,91 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
     setRooms((roomsForPost || []).map((r: any) => r.rooms).filter(Boolean))
 
     const joinedRoomIds = (joinedRooms || []).map((r: any) => r.room_id)
+    const followedRoomIds = (followedRoomRows || []).map((r: any) => r.room_id)
     const followingIds = (following || []).map((f: any) => f.following_id)
-    const conditions: string[] = []
-    if (joinedRoomIds.length > 0) conditions.push(`room_id.in.(${joinedRoomIds.join(',')})`)
-    if (followingIds.length > 0) conditions.push(`user_id.in.(${followingIds.join(',')})`)
+    const allRoomIds = [...new Set([...joinedRoomIds, ...followedRoomIds])]
 
+    const isNewUserFlag = joinedRoomIds.length === 0 && followingIds.length === 0
+    setIsNewUser(isNewUserFlag)
+
+    const postSelect = '*, profiles(name, username, avatar_url), rooms(id, name, emoji, category, member_count)'
+
+    if (isNewUserFlag) {
+      // New user: show trending posts
+      const [{ data: trending }, { data: suggested }] = await Promise.all([
+        supabase.from('posts').select(postSelect).order('like_count', { ascending: false }).limit(30),
+        supabase.from('rooms').select('id, name, emoji, category, member_count').order('member_count', { ascending: false }).limit(6),
+      ])
+      setPosts(trending || [])
+      setSuggestedRooms(suggested || [])
+      setHasMore((trending?.length || 0) === 30)
+      setDataLoading(false)
+      return
+    }
+
+    // 40% followed users posts, 40% followed/joined rooms posts, 20% trending
+    const limit40 = 12
+    const limit20 = 6
+
+    const queries: Promise<{ data: any[] | null }>[] = []
+
+    // 40% — posts from people you follow
+    if (followingIds.length > 0) {
+      queries.push(supabase.from('posts').select(postSelect).in('user_id', followingIds).order('created_at', { ascending: false }).limit(limit40) as any)
+    } else {
+      queries.push(Promise.resolve({ data: [] }))
+    }
+
+    // 40% — posts from rooms you follow or joined
+    if (allRoomIds.length > 0) {
+      queries.push(supabase.from('posts').select(postSelect).in('room_id', allRoomIds).order('created_at', { ascending: false }).limit(limit40) as any)
+    } else {
+      queries.push(Promise.resolve({ data: [] }))
+    }
+
+    // 20% — trending posts (most liked in last 7 days)
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    queries.push(supabase.from('posts').select(postSelect).gte('created_at', weekAgo).order('like_count', { ascending: false }).limit(limit20) as any)
+
+    // Suggested rooms
     const fallbackId = '00000000-0000-0000-0000-000000000000'
-    const notInIds = joinedRoomIds.length > 0 ? joinedRoomIds.join(',') : fallbackId
+    const notInIds = allRoomIds.length > 0 ? allRoomIds : [fallbackId]
+    queries.push(supabase.from('rooms').select('id, name, emoji, category, member_count').not('id', 'in', `(${notInIds.join(',')})`).order('member_count', { ascending: false }).limit(5) as any)
 
-    const [postsResult, { data: suggested }] = await Promise.all([
-      conditions.length > 0
-        ? supabase.from('posts').select('*, profiles(name, username, avatar_url), rooms(name, emoji, category)').or(conditions.join(',')).order('created_at', { ascending: false }).limit(30)
-        : supabase.from('posts').select('*, profiles(name, username, avatar_url), rooms(name, emoji, category)').order('like_count', { ascending: false }).limit(30),
-      supabase.from('rooms').select('id, name, emoji, category, member_count').not('id', 'in', `(${notInIds})`).order('member_count', { ascending: false }).limit(5),
-    ])
+    const [followedUserPosts, roomPosts, trendingPosts, { data: suggested }] = await Promise.all(queries)
 
-    const fetchedPosts = postsResult.data || []
-    setPosts(fetchedPosts)
+    // Merge and deduplicate posts
+    const seen = new Set<string>()
+    const merged: any[] = []
+
+    // Interleave: 2 user posts, 2 room posts, 1 trending — repeat
+    const up = (followedUserPosts.data || []).slice()
+    const rp = (roomPosts.data || []).slice()
+    const tp = (trendingPosts.data || []).slice()
+
+    const maxLen = Math.max(up.length, rp.length, tp.length)
+    for (let i = 0; i < maxLen; i++) {
+      // Add 2 from followed users
+      for (let j = 0; j < 2; j++) {
+        const post = up[i * 2 + j]
+        if (post && !seen.has(post.id)) { seen.add(post.id); merged.push({ ...post, _source: 'following' }) }
+      }
+      // Add 2 from rooms
+      for (let j = 0; j < 2; j++) {
+        const post = rp[i * 2 + j]
+        if (post && !seen.has(post.id)) { seen.add(post.id); merged.push({ ...post, _source: 'room' }) }
+      }
+      // Add 1 trending
+      const tp_post = tp[i]
+      if (tp_post && !seen.has(tp_post.id)) { seen.add(tp_post.id); merged.push({ ...tp_post, _source: 'trending' }) }
+    }
+
+    // Also load online counts for rooms in feed
+    const roomIdsInFeed = [...new Set(merged.map((p: any) => p.room_id).filter(Boolean))]
+
+    setPosts(merged.slice(0, 30))
     setSuggestedRooms(suggested || [])
-    setIsNewUser(joinedRoomIds.length === 0 && followingIds.length === 0)
-    setHasMore(fetchedPosts.length === 30)
+    setHasMore(merged.length === 30)
     setDataLoading(false)
   }
 
@@ -408,6 +475,21 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
               {post.type === 'poll' && (
                 <div style={{ padding: '0 14px 8px' }}>
                   <PollBlock post={post} pollVotes={pollVotes} onLoad={() => loadPollData(post.id)} onVote={(pollId: string, optIdx: number, opts: any[]) => votePoll(pollId, post.id, optIdx, opts)} />
+                </div>
+              )}
+
+              {/* Room context card — shows when post came from a followed room */}
+              {post.rooms && post._source === 'room' && (
+                <div onClick={() => router.push(`/rooms/${post.room_id}`)} style={{ margin: '0 14px 8px', padding: '10px 12px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', transition: 'background .18s' }}
+                  onMouseOver={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
+                  onMouseOut={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg2)'}
+                >
+                  <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: 'var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{post.rooms.emoji}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text1)' }}>{post.rooms.name}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{post.comment_count > 0 ? `💬 ${post.comment_count} replies` : 'Room discussion'}</div>
+                  </div>
+                  <div style={{ padding: '5px 12px', background: 'var(--accent)', borderRadius: '8px', color: '#fff', fontSize: '11px', fontWeight: '600', flexShrink: 0 }}>Enter →</div>
                 </div>
               )}
 
