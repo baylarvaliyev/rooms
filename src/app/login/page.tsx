@@ -62,13 +62,12 @@ export default function LoginPage() {
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <div style={{
-            width: '52px', height: '52px',
-            background: 'linear-gradient(135deg, #6366f1, #a855f7)',
-            borderRadius: '14px',
+            width: '56px', height: '56px',
+            background: 'var(--ig-gradient)',
+            borderRadius: '16px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: '800', fontSize: '23px', color: '#fff',
+            fontWeight: '900', fontSize: '26px', color: '#fff',
             margin: '0 auto 12px',
-            animation: 'glow 3s ease-in-out infinite'
           }}>R</div>
           <div style={{ fontWeight: '800', fontSize: '22px' }}>Rooms</div>
           <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '3px' }}>Join live experiences, not feeds</div>
@@ -174,11 +173,12 @@ export default function LoginPage() {
 
         <button onClick={handleSubmit} disabled={loading} style={{
           width: '100%', padding: '11px',
-          background: 'var(--accent)', border: 'none', borderRadius: '10px',
+          background: 'var(--ig-gradient)', border: 'none', borderRadius: '10px',
           fontSize: '14px', fontWeight: '600', color: '#fff',
           cursor: loading ? 'not-allowed' : 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-          opacity: loading ? .7 : 1, transition: 'all .18s'
+          opacity: loading ? .7 : 1, transition: 'all .18s',
+          fontFamily: 'inherit'
         }}>
           {loading ? <><div className="spinner" /> Loading…</> : mode === 'signin' ? 'Sign in' : 'Create account'}
         </button>

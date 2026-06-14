@@ -34,11 +34,11 @@ export default function OnboardingPage() {
 
     const { error } = await supabase
       .from('profiles')
-      .update({ name, username })
+      .update({ name, username, interests: selected })
       .eq('id', user.id)
 
     if (error) { setError(error.message); setLoading(false); return }
-    router.push('/feed')
+    router.push('/explore')
   }
 
   return (
