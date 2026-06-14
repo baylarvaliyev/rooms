@@ -32,6 +32,8 @@ export default function MessagesClient() {
   const [view, setView] = useState<'list' | 'chat'>('list')
   const [loading, setLoading] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set())
+  const typingTimeoutRef = useRef<any>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -157,6 +159,28 @@ export default function MessagesClient() {
       .or(`and(from_user.eq.${currentUserId},to_user.eq.${user.id}),and(from_user.eq.${user.id},to_user.eq.${currentUserId})`)
       .order('created_at', { ascending: true })
     setMessages(data || [])
+    // Mark messages as read
+    await supabase.from('direct_messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('to_user', currentUserId)
+      .eq('from_user', user.id)
+      .is('read_at', null)
+    // Subscribe to typing indicators for this conversation
+    const typingChannel = supabase.channel(`typing:${[currentUserId, user.id].sort().join('-')}`)
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        if (payload.user_id !== currentUserId) {
+          setTypingUsers(prev => new Set([...prev, payload.user_id]))
+          setTimeout(() => setTypingUsers(prev => { const n = new Set(prev); n.delete(payload.user_id); return n }), 3000)
+        }
+      })
+      .subscribe()
+    return () => supabase.removeChannel(typingChannel)
+  }
+
+  function handleTyping() {
+    if (!activeUser || !currentUserId) return
+    const channelName = `typing:${[currentUserId, activeUser.id].sort().join('-')}`
+    supabase.channel(channelName).send({ type: 'broadcast', event: 'typing', payload: { user_id: currentUserId } })
   }
 
   async function sendMessage() {
@@ -321,6 +345,11 @@ export default function MessagesClient() {
                     )}
                     <div style={{ maxWidth: '72%', padding: '9px 13px', borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: isMe ? 'var(--accent)' : 'var(--bg3)', color: isMe ? '#fff' : 'var(--text1)', border: isMe ? 'none' : '1px solid var(--border)', fontSize: '14px', lineHeight: '1.5', wordBreak: 'break-word' }}>
                       {msg.content}
+                      {isMe && (
+                        <div style={{ fontSize: '10px', opacity: .7, marginTop: '2px', textAlign: 'right' }}>
+                          {msg.read_at ? '✓✓' : '✓'}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
@@ -328,10 +357,20 @@ export default function MessagesClient() {
               <div ref={bottomRef} />
             </div>
 
+            {/* Typing indicator */}
+            {typingUsers.size > 0 && (
+              <div style={{ padding: '4px 16px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+                  {[0,1,2].map(i => <div key={i} style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--text3)', animation: `bounce .9s ease ${i * 0.15}s infinite` }} />)}
+                </div>
+                <span style={{ fontSize: '11px', color: 'var(--text3)' }}>{activeUser.name} is typing…</span>
+              </div>
+            )}
+
             {/* Input */}
             <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', background: 'var(--bg0)', flexShrink: 0 }}>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'var(--bg3)', borderRadius: '24px', padding: '8px 8px 8px 16px' }}>
-                <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()} placeholder={`Message ${activeUser.name}…`} style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text1)', fontSize: '14px', fontFamily: 'inherit' }} />
+                <input value={input} onChange={e => { setInput(e.target.value); handleTyping() }} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()} placeholder={`Message ${activeUser.name}…`} style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text1)', fontSize: '14px', fontFamily: 'inherit' }} />
                 <button onClick={sendMessage} disabled={!input.trim() || sending} style={{ width: '36px', height: '36px', background: input.trim() ? 'var(--accent)' : 'transparent', border: 'none', borderRadius: '50%', cursor: 'pointer', color: input.trim() ? '#fff' : 'var(--text3)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .2s', flexShrink: 0 }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 </button>

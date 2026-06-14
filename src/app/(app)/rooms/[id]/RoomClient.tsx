@@ -24,6 +24,8 @@ const ROOM_COLORS: Record<string, string> = {
   Lifestyle: 'linear-gradient(135deg,#0a0a2a,#1a1a4e)',
 }
 
+const REACTION_EMOJIS = ['👍','❤️','😂','🔥','😮','👏','💯','🎉']
+
 function timeAgo(date: string) {
   const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
   if (s < 60) return `${s}s`
@@ -46,15 +48,7 @@ function FounderDashboard({ room, members, onlineCount, schedules, supabase }: a
   async function loadAnalytics() {
     const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-
-    const [
-      { count: msgs7d },
-      { count: msgs30d },
-      { count: totalMsgs },
-      { data: recentMembers },
-      { data: topContributors },
-      { data: msgsByDay },
-    ] = await Promise.all([
+    const [{ count: msgs7d }, { count: msgs30d }, { count: totalMsgs }, { data: recentMembers }, { data: topContributors }, { data: msgsByDay }] = await Promise.all([
       supabase.from('messages').select('*', { count: 'exact', head: true }).eq('room_id', room.id).gte('created_at', since7d),
       supabase.from('messages').select('*', { count: 'exact', head: true }).eq('room_id', room.id).gte('created_at', since30d),
       supabase.from('messages').select('*', { count: 'exact', head: true }).eq('room_id', room.id),
@@ -62,8 +56,6 @@ function FounderDashboard({ room, members, onlineCount, schedules, supabase }: a
       supabase.from('messages').select('user_id, profiles(name, avatar_url)').eq('room_id', room.id).gte('created_at', since30d),
       supabase.from('messages').select('created_at').eq('room_id', room.id).gte('created_at', since7d),
     ])
-
-    // Top contributors
     const contrib: Record<string, any> = {}
     ;(topContributors || []).forEach((m: any) => {
       if (!m.user_id) return
@@ -71,8 +63,6 @@ function FounderDashboard({ room, members, onlineCount, schedules, supabase }: a
       contrib[m.user_id].count++
     })
     const topList = Object.values(contrib).sort((a: any, b: any) => b.count - a.count).slice(0, 5)
-
-    // Messages by day (last 7 days)
     const dayMap: Record<string, number> = {}
     for (let i = 6; i >= 0; i--) {
       const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
@@ -82,8 +72,6 @@ function FounderDashboard({ room, members, onlineCount, schedules, supabase }: a
       const day = new Date(m.created_at).toLocaleDateString('en', { weekday: 'short' })
       if (dayMap[day] !== undefined) dayMap[day]++
     })
-
-    // Member growth (last 30 days by week)
     const weekMap: Record<string, number> = { 'Week 1': 0, 'Week 2': 0, 'Week 3': 0, 'Week 4': 0 }
     ;(recentMembers || []).forEach((m: any) => {
       const daysAgo = Math.floor((Date.now() - new Date(m.created_at).getTime()) / (24 * 60 * 60 * 1000))
@@ -92,13 +80,11 @@ function FounderDashboard({ room, members, onlineCount, schedules, supabase }: a
       else if (daysAgo <= 21) weekMap['Week 2']++
       else if (daysAgo <= 30) weekMap['Week 1']++
     })
-
     setAnalytics({ msgs7d, msgs30d, totalMsgs, topList, dayMap, weekMap })
     setLoading(false)
   }
 
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}><div className="spinner" /></div>
-
   const memberCount = members.length
   const mods = members.filter((m: any) => m.is_moderator).length
   const dayValues = Object.values(analytics.dayMap) as number[]
@@ -108,15 +94,14 @@ function FounderDashboard({ room, members, onlineCount, schedules, supabase }: a
 
   return (
     <div>
-      {/* Key metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
         {[
           { label: 'Total Members', value: memberCount, icon: '👥', color: '#6366f1' },
           { label: 'Online Now', value: onlineCount, icon: '🟢', color: '#22c55e' },
           { label: 'Messages (7d)', value: analytics.msgs7d || 0, icon: '💬', color: '#0891b2' },
-          { label: 'Messages (30d)', value: analytics.msgs30d || 0, icon: '📊', color: '#f97316' },
-          { label: 'All Time Msgs', value: analytics.totalMsgs || 0, icon: '📨', color: '#a855f7' },
+          { label: 'All Time', value: analytics.totalMsgs || 0, icon: '📨', color: '#a855f7' },
           { label: 'Moderators', value: mods, icon: '🛡', color: '#ec4899' },
+          { label: 'Events', value: schedules.length, icon: '📅', color: '#f97316' },
         ].map(s => (
           <div key={s.label} style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '12px', border: `1px solid ${s.color}22` }}>
             <div style={{ fontSize: '18px', marginBottom: '4px' }}>{s.icon}</div>
@@ -125,78 +110,38 @@ function FounderDashboard({ room, members, onlineCount, schedules, supabase }: a
           </div>
         ))}
       </div>
-
-      {/* Capacity bar */}
       {room.max_members && (
-        <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
+        <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px', marginBottom: '14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text2)' }}>Room Capacity</span>
+            <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text2)' }}>Capacity</span>
             <span style={{ fontSize: '12px', color: 'var(--text1)', fontWeight: '700' }}>{memberCount} / {room.max_members}</span>
           </div>
           <div style={{ height: '8px', background: 'var(--bg4)', borderRadius: '4px', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${Math.min(100, (memberCount / room.max_members) * 100)}%`, background: memberCount / room.max_members > 0.8 ? 'var(--red)' : 'var(--ig-gradient)', borderRadius: '4px', transition: 'width .5s' }} />
+            <div style={{ height: '100%', width: `${Math.min(100, (memberCount / room.max_members) * 100)}%`, background: memberCount / room.max_members > 0.8 ? 'var(--red)' : 'var(--ig-gradient)', borderRadius: '4px' }} />
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px' }}>{Math.round((memberCount / room.max_members) * 100)}% full</div>
         </div>
       )}
-
-      {/* Messages per day chart */}
-      <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
-        <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text2)', marginBottom: '14px' }}>💬 Messages — Last 7 Days</div>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '80px' }}>
+      <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px', marginBottom: '14px' }}>
+        <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text2)', marginBottom: '12px' }}>💬 Messages — Last 7 Days</div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '70px' }}>
           {Object.entries(analytics.dayMap).map(([day, count]: [string, any]) => (
             <div key={day} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', height: '100%', justifyContent: 'flex-end' }}>
-              <div style={{ fontSize: '10px', color: 'var(--text3)', fontWeight: '600' }}>{count > 0 ? count : ''}</div>
-              <div style={{ width: '100%', background: count > 0 ? 'var(--accent)' : 'var(--bg4)', borderRadius: '4px 4px 0 0', height: `${Math.max(4, (count / maxDay) * 60)}px`, transition: 'height .4s ease' }} />
+              <div style={{ fontSize: '9px', color: 'var(--text3)' }}>{count > 0 ? count : ''}</div>
+              <div style={{ width: '100%', background: count > 0 ? 'var(--accent)' : 'var(--bg4)', borderRadius: '3px 3px 0 0', height: `${Math.max(4, (count / maxDay) * 50)}px` }} />
               <div style={{ fontSize: '9px', color: 'var(--text3)' }}>{day}</div>
             </div>
           ))}
         </div>
-        {analytics.msgs7d === 0 && <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text3)', marginTop: '8px' }}>No messages yet this week</div>}
       </div>
-
-      {/* Member growth chart */}
-      <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
-        <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text2)', marginBottom: '14px' }}>👥 New Members — Last 30 Days</div>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '70px' }}>
-          {Object.entries(analytics.weekMap).map(([week, count]: [string, any]) => (
-            <div key={week} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', height: '100%', justifyContent: 'flex-end' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text3)', fontWeight: '600' }}>{count > 0 ? `+${count}` : ''}</div>
-              <div style={{ width: '100%', background: count > 0 ? '#22c55e' : 'var(--bg4)', borderRadius: '4px 4px 0 0', height: `${Math.max(4, (count / maxWeek) * 50)}px`, transition: 'height .4s ease' }} />
-              <div style={{ fontSize: '9px', color: 'var(--text3)' }}>{week}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Top contributors */}
       {analytics.topList.length > 0 && (
-        <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
-          <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text2)', marginBottom: '12px' }}>🏆 Top Contributors (30d)</div>
-          {analytics.topList.map((u: any, i: number) => (
-            <div key={u.id || i} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-              <div style={{ width: '20px', fontWeight: '700', fontSize: '12px', color: i < 3 ? 'var(--yellow)' : 'var(--text3)', textAlign: 'center' }}>{['🥇','🥈','🥉'][i] || i + 1}</div>
-              <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: '#6366f1', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: '#fff' }}>
-                {(u.name || 'U').charAt(0).toUpperCase()}
-              </div>
-              <div style={{ flex: 1, fontSize: '13px', fontWeight: '500' }}>{u.name || 'Unknown'}</div>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--accent2)' }}>{u.count} msgs</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Upcoming events */}
-      {schedules.length > 0 && (
         <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px' }}>
-          <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text2)', marginBottom: '10px' }}>📅 Scheduled Events</div>
-          {schedules.slice(0, 3).map((s: any) => (
-            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', padding: '8px', background: 'var(--bg4)', borderRadius: '8px' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '12px', fontWeight: '600' }}>{s.title}</div>
-                <div style={{ fontSize: '10px', color: 'var(--accent)' }}>{new Date(s.starts_at).toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
-              </div>
-              {s.is_recurring && <span style={{ fontSize: '9px', background: 'rgba(99,102,241,.2)', color: 'var(--accent2)', padding: '2px 6px', borderRadius: '4px' }}>🔄 {s.recurrence}</span>}
+          <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text2)', marginBottom: '10px' }}>🏆 Top Contributors (30d)</div>
+          {analytics.topList.map((u: any, i: number) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ width: '20px', fontWeight: '700', fontSize: '12px', color: i < 3 ? 'var(--yellow)' : 'var(--text3)' }}>{['🥇','🥈','🥉'][i] || i + 1}</div>
+              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: '#fff' }}>{(u.name || 'U').charAt(0).toUpperCase()}</div>
+              <div style={{ flex: 1, fontSize: '13px' }}>{u.name || 'Unknown'}</div>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--accent2)' }}>{u.count} msgs</div>
             </div>
           ))}
         </div>
@@ -214,13 +159,11 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
   const [sending, setSending] = useState(false)
   const [showMembers, setShowMembers] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [showSchedule, setShowSchedule] = useState(false)
   const [onlineCount, setOnlineCount] = useState(1)
   const [pinnedMsg, setPinnedMsg] = useState<any>(null)
   const [pinInput, setPinInput] = useState('')
   const [showPinInput, setShowPinInput] = useState(false)
   const [rules, setRules] = useState(initialRoom.rules || '')
-  const [editingRules, setEditingRules] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ msgId: string, x: number, y: number, content: string } | null>(null)
   const [isFollowing, setIsFollowing] = useState(false)
   const [inviteCode, setInviteCode] = useState('')
@@ -234,15 +177,21 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
   const [uploadingCover, setUploadingCover] = useState(false)
   const [settingsTab, setSettingsTab] = useState<'general'|'schedule'|'members'|'invite'|'analytics'>('general')
   const [joinRequests, setJoinRequests] = useState<any[]>([])
-  // Room settings form
   const [settingsForm, setSettingsForm] = useState({
-    name: initialRoom.name,
-    description: initialRoom.description || '',
-    is_private: initialRoom.is_private || false,
-    join_mode: initialRoom.join_mode || 'open',
-    max_members: initialRoom.max_members || '',
-    slug: initialRoom.slug || '',
+    name: initialRoom.name, description: initialRoom.description || '',
+    is_private: initialRoom.is_private || false, join_mode: initialRoom.join_mode || 'open',
+    max_members: initialRoom.max_members || '', slug: initialRoom.slug || '',
   })
+  // Reactions
+  const [reactions, setReactions] = useState<Record<string, any[]>>({})
+  const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null)
+  // Rules on join modal
+  const [showRulesModal, setShowRulesModal] = useState(false)
+  // Share post modal
+  const [sharePost, setSharePost] = useState<any>(null)
+  const [shareMsg, setShareMsg] = useState('')
+  // Debate moderation
+  const [showDebateMod, setShowDebateMod] = useState(false)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const iconInputRef = useRef<HTMLInputElement>(null)
@@ -256,9 +205,7 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
   const memberCount = members.length
   const isAtMax = room.max_members && memberCount >= room.max_members
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   useEffect(() => {
     loadExtra()
@@ -271,14 +218,27 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `room_id=eq.${room.id}` }, (payload) => {
         setMessages((prev: any[]) => prev.filter((m: any) => m.id !== payload.old.id))
       })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reactions' }, async (payload) => {
+        const r = payload.new as any
+        // Reload reactions for that message
+        loadReactionsForMessage(r.message_id)
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'message_reactions' }, async (payload) => {
+        const r = payload.old as any
+        loadReactionsForMessage(r.message_id)
+      })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          const myName = currentUser?.user_metadata?.name || currentUser?.email?.split('@')[0] || 'User'
-          await channel.track({ user_id: currentUser.id, name: myName, online_at: new Date().toISOString() })
+          await channel.track({ user_id: currentUser.id, name: currentUser?.user_metadata?.name || 'User', online_at: new Date().toISOString() })
         }
       })
     return () => { supabase.removeChannel(channel) }
   }, [room.id])
+
+  async function loadReactionsForMessage(messageId: string) {
+    const { data } = await supabase.from('message_reactions').select('*').eq('message_id', messageId)
+    setReactions(prev => ({ ...prev, [messageId]: data || [] }))
+  }
 
   async function loadExtra() {
     const [pinRes, followRes, schedRes, rsvpRes] = await Promise.all([
@@ -295,6 +255,17 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
       const { data: reqs } = await supabase.from('room_join_requests').select('*, profiles(name, username)').eq('room_id', room.id).eq('status', 'pending')
       setJoinRequests(reqs || [])
     }
+    // Load reactions for recent messages
+    if (initialMessages.length > 0) {
+      const msgIds = initialMessages.map((m: any) => m.id)
+      const { data: reactionData } = await supabase.from('message_reactions').select('*').in('message_id', msgIds)
+      const grouped: Record<string, any[]> = {}
+      ;(reactionData || []).forEach((r: any) => {
+        if (!grouped[r.message_id]) grouped[r.message_id] = []
+        grouped[r.message_id].push(r)
+      })
+      setReactions(grouped)
+    }
   }
 
   async function joinRoom() {
@@ -302,13 +273,22 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
     if (room.join_mode === 'invite_only') { alert('This room is invite only'); return }
     if (room.join_mode === 'request') {
       await supabase.from('room_join_requests').insert({ room_id: room.id, user_id: currentUser.id })
-      alert('Join request sent! The owner will review it.')
+      alert('Join request sent!')
       return
     }
-    await supabase.from('room_members').insert({ room_id: room.id, user_id: currentUser.id, role: 'member' })
-    await supabase.from('rooms').update({ member_count: (room.member_count || 0) + 1 }).eq('id', room.id)
+    // Show rules modal if rules exist
+    if (room.rules && room.rules.trim()) {
+      setShowRulesModal(true)
+      return
+    }
+    await doJoin()
+  }
+
+  async function doJoin() {
+    await supabase.from('room_members').insert({ room_id: room.id, user_id: currentUser.id, role: 'member', rules_accepted: true })
     setJoined(true)
-    setMembers((prev: any[]) => [...prev, { user_id: currentUser.id, role: 'member', profiles: { name: currentUser.name || 'You' } }])
+    setShowRulesModal(false)
+    setMembers((prev: any[]) => [...prev, { user_id: currentUser.id, role: 'member', profiles: { name: 'You' } }])
   }
 
   async function sendMessage() {
@@ -329,6 +309,16 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
     setContextMenu(null)
   }
 
+  async function toggleReaction(messageId: string, emoji: string) {
+    const existing = (reactions[messageId] || []).find(r => r.user_id === currentUser.id && r.emoji === emoji)
+    if (existing) {
+      await supabase.from('message_reactions').delete().eq('id', existing.id)
+    } else {
+      await supabase.from('message_reactions').insert({ message_id: messageId, user_id: currentUser.id, emoji })
+    }
+    setShowReactionPicker(null)
+  }
+
   async function pinMessage(content: string) {
     if (!content.trim()) return
     await supabase.from('room_pinned_messages').upsert({ room_id: room.id, content: content.trim(), pinned_by: currentUser.id }, { onConflict: 'room_id' })
@@ -347,9 +337,9 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
     setMembers((prev: any[]) => prev.filter((m: any) => m.user_id !== userId))
   }
 
-  async function toggleModerator(userId: string, isMod: boolean) {
-    await supabase.from('room_members').update({ is_moderator: !isMod }).eq('room_id', room.id).eq('user_id', userId)
-    setMembers((prev: any[]) => prev.map((m: any) => m.user_id === userId ? { ...m, is_moderator: !isMod } : m))
+  async function toggleModerator(userId: string, mod: boolean) {
+    await supabase.from('room_members').update({ is_moderator: !mod }).eq('room_id', room.id).eq('user_id', userId)
+    setMembers((prev: any[]) => prev.map((m: any) => m.user_id === userId ? { ...m, is_moderator: !mod } : m))
   }
 
   async function toggleFollow() {
@@ -376,11 +366,10 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
 
   async function saveRoomSettings() {
     const updates: any = {
-      name: settingsForm.name,
-      description: settingsForm.description,
-      is_private: settingsForm.is_private,
-      join_mode: settingsForm.join_mode,
+      name: settingsForm.name, description: settingsForm.description,
+      is_private: settingsForm.is_private, join_mode: settingsForm.join_mode,
       max_members: settingsForm.max_members ? parseInt(settingsForm.max_members) : null,
+      rules,
     }
     if (settingsForm.slug) updates.slug = settingsForm.slug.toLowerCase().replace(/[^a-z0-9-]/g, '-')
     await supabase.from('rooms').update(updates).eq('id', room.id)
@@ -389,8 +378,7 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
   }
 
   async function uploadRoomIcon(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0]; if (!file) return
     setUploadingIcon(true)
     const path = `room-icons/${room.id}-${Date.now()}.${file.name.split('.').pop()}`
     const { error } = await supabase.storage.from('posts').upload(path, file, { upsert: true })
@@ -403,8 +391,7 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
   }
 
   async function uploadRoomCover(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0]; if (!file) return
     setUploadingCover(true)
     const path = `room-covers/${room.id}-${Date.now()}.${file.name.split('.').pop()}`
     const { error } = await supabase.storage.from('posts').upload(path, file, { upsert: true })
@@ -435,7 +422,22 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
       is_recurring: eventForm.is_recurring,
       recurrence: eventForm.is_recurring ? eventForm.recurrence : null,
     }).select('*, profiles(name)').single()
-    if (data) setSchedules(prev => [...prev, data])
+    if (data) {
+      setSchedules(prev => [...prev, data])
+      // Send notification to all room followers
+      const { data: followers } = await supabase.from('room_follows').select('user_id').eq('room_id', room.id)
+      if (followers && followers.length > 0) {
+        await supabase.from('notifications').insert(
+          followers.map((f: any) => ({
+            user_id: f.user_id,
+            type: 'room_event',
+            content: `📅 New event in ${room.name}: ${eventForm.title}`,
+            room_id: room.id,
+            read: false,
+          }))
+        )
+      }
+    }
     setShowNewEvent(false)
     setEventForm({ title: '', description: '', starts_at: '', is_recurring: false, recurrence: 'weekly' })
   }
@@ -456,87 +458,107 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
     setJoinRequests(prev => prev.filter(r => r.id !== requestId))
   }
 
+  // Group reactions by emoji for display
+  function getReactionGroups(messageId: string) {
+    const msgReactions = reactions[messageId] || []
+    const groups: Record<string, { count: number, mine: boolean }> = {}
+    msgReactions.forEach(r => {
+      if (!groups[r.emoji]) groups[r.emoji] = { count: 0, mine: false }
+      groups[r.emoji].count++
+      if (r.user_id === currentUser.id) groups[r.emoji].mine = true
+    })
+    return groups
+  }
+
   const upcomingEvents = schedules.filter(s => new Date(s.starts_at) > new Date()).slice(0, 3)
 
   return (
-    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }} onClick={() => contextMenu && setContextMenu(null)}>
+    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }} onClick={() => { contextMenu && setContextMenu(null); showReactionPicker && setShowReactionPicker(null) }}>
       <input ref={iconInputRef} type="file" accept="image/*" onChange={uploadRoomIcon} style={{ display: 'none' }} />
       <input ref={coverInputRef} type="file" accept="image/*" onChange={uploadRoomCover} style={{ display: 'none' }} />
+
+      {/* RULES ON JOIN MODAL */}
+      {showRulesModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '420px' }} className="fade-up">
+            <div style={{ fontSize: '24px', textAlign: 'center', marginBottom: '8px' }}>📋</div>
+            <div style={{ fontWeight: '700', fontSize: '16px', textAlign: 'center', marginBottom: '4px' }}>{room.name} — Room Rules</div>
+            <div style={{ fontSize: '12px', color: 'var(--text3)', textAlign: 'center', marginBottom: '16px' }}>Please read and accept before joining</div>
+            <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px', fontSize: '13px', color: 'var(--text2)', lineHeight: '1.7', whiteSpace: 'pre-wrap', marginBottom: '16px', maxHeight: '200px', overflowY: 'auto' }}>{room.rules}</div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setShowRulesModal(false)} style={{ flex: 1, padding: '11px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text2)', cursor: 'pointer', fontSize: '13px', fontFamily: 'inherit' }}>Cancel</button>
+              <button onClick={doJoin} style={{ flex: 2, padding: '11px', background: 'var(--ig-gradient)', border: 'none', borderRadius: '10px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: 'inherit' }}>Accept & Join</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MAIN */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {/* Cover photo */}
-        <div style={{ height: '90px', background: room.cover_url ? 'none' : (ROOM_COLORS[room.category] || 'var(--bg3)'), flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
+        {/* Cover */}
+        <div style={{ height: '80px', background: room.cover_url ? 'none' : (ROOM_COLORS[room.category] || 'var(--bg3)'), flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
           {room.cover_url && <img src={room.cover_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />}
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,.2), rgba(0,0,0,.5))' }} />
-          {/* Back button */}
           <button onClick={() => router.back()} style={{ position: 'absolute', top: '10px', left: '10px', background: 'rgba(0,0,0,.5)', border: 'none', color: '#fff', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
-          {isOwner && (
-            <button onClick={() => coverInputRef.current?.click()} style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(0,0,0,.5)', border: 'none', color: '#fff', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              {uploadingCover ? '…' : '📷 Cover'}
-            </button>
-          )}
+          {isOwner && <button onClick={() => coverInputRef.current?.click()} style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(0,0,0,.5)', border: 'none', color: '#fff', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>{uploadingCover ? '…' : '📷'}</button>}
         </div>
 
-        {/* Room header */}
+        {/* Header */}
         <div style={{ padding: '0 14px 10px', borderBottom: '1px solid var(--border)', background: 'var(--bg0)', flexShrink: 0, marginTop: '-20px', position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', marginBottom: '8px' }}>
-            {/* Room icon */}
-            <div onClick={() => isOwner && iconInputRef.current?.click()} style={{ width: '52px', height: '52px', borderRadius: '12px', border: '2px solid var(--bg0)', overflow: 'hidden', background: ROOM_COLORS[room.category] || 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0, cursor: isOwner ? 'pointer' : 'default', position: 'relative' }}>
+            <div onClick={() => isOwner && iconInputRef.current?.click()} style={{ width: '50px', height: '50px', borderRadius: '12px', border: '2px solid var(--bg0)', overflow: 'hidden', background: ROOM_COLORS[room.category] || 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0, cursor: isOwner ? 'pointer' : 'default', position: 'relative' }}>
               {room.icon_url ? <img src={room.icon_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : room.emoji}
               {uploadingIcon && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: '700', fontSize: '15px' }}>{room.name}</span>
-                {isOwner && <span style={{ fontSize: '9px', background: 'var(--ig-gradient)', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontWeight: '700' }}>👑 Founder</span>}
-                {!isOwner && isMod && <span style={{ fontSize: '9px', background: 'rgba(99,102,241,.2)', color: 'var(--accent2)', padding: '1px 6px', borderRadius: '4px' }}>🛡 Mod</span>}
-                {room.is_private && <span style={{ fontSize: '9px', background: 'rgba(239,68,68,.15)', color: 'var(--red)', padding: '1px 6px', borderRadius: '4px' }}>🔒 Private</span>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: '700', fontSize: '14px' }}>{room.name}</span>
+                {isOwner && <span style={{ fontSize: '9px', background: 'var(--ig-gradient)', color: '#fff', padding: '1px 5px', borderRadius: '4px', fontWeight: '700' }}>👑</span>}
+                {!isOwner && isMod && <span style={{ fontSize: '9px', background: 'rgba(99,102,241,.2)', color: 'var(--accent2)', padding: '1px 5px', borderRadius: '4px' }}>🛡</span>}
+                {room.is_private && <span style={{ fontSize: '9px', background: 'rgba(239,68,68,.15)', color: 'var(--red)', padding: '1px 5px', borderRadius: '4px' }}>🔒</span>}
                 <span className="live-dot" />
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
                 {memberCount} members · <span style={{ color: 'var(--green)' }}>{onlineCount} online</span>
-                {room.max_members && <span> · max {room.max_members}</span>}
               </div>
             </div>
             <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-              <button onClick={toggleFollow} style={{ padding: '5px 10px', borderRadius: '20px', border: `1px solid ${isFollowing ? 'var(--border)' : 'var(--accent)'}`, background: isFollowing ? 'var(--bg3)' : 'rgba(225,48,108,.1)', color: isFollowing ? 'var(--text3)' : 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
-                {isFollowing ? '🔔' : '🔔 Follow'}
+              <button onClick={toggleFollow} style={{ padding: '5px 9px', borderRadius: '20px', border: `1px solid ${isFollowing ? 'var(--border)' : 'var(--accent)'}`, background: isFollowing ? 'var(--bg3)' : 'rgba(225,48,108,.1)', color: isFollowing ? 'var(--text3)' : 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
+                {isFollowing ? '🔔' : '+ Follow'}
               </button>
-              <button onClick={() => setShowMembers(s => !s)} style={{ background: showMembers ? 'var(--bg3)' : 'none', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', color: showMembers ? 'var(--text1)' : 'var(--text3)', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+              <button onClick={() => setShowMembers(s => !s)} style={{ background: showMembers ? 'var(--bg3)' : 'none', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', color: 'var(--text3)', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
               </button>
               {joined && (
-                <button onClick={() => setShowSettings(true)} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', color: 'var(--text3)', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                <button onClick={() => setShowSettings(true)} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', color: 'var(--text3)', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
                 </button>
               )}
               {!joined && (
-                <button onClick={joinRoom} disabled={!!isAtMax} style={{ padding: '5px 14px', background: isAtMax ? 'var(--bg3)' : 'var(--accent)', border: 'none', borderRadius: '8px', color: isAtMax ? 'var(--text3)' : '#fff', fontSize: '12px', fontWeight: '600', cursor: isAtMax ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+                <button onClick={joinRoom} disabled={!!isAtMax} style={{ padding: '5px 12px', background: isAtMax ? 'var(--bg3)' : 'var(--accent)', border: 'none', borderRadius: '8px', color: isAtMax ? 'var(--text3)' : '#fff', fontSize: '12px', fontWeight: '600', cursor: isAtMax ? 'default' : 'pointer', fontFamily: 'inherit' }}>
                   {isAtMax ? 'Full' : room.join_mode === 'request' ? 'Request' : 'Join'}
                 </button>
               )}
             </div>
           </div>
 
-          {/* Room description */}
           {room.description && <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '6px', lineHeight: '1.5' }}>{room.description}</div>}
 
           {/* Upcoming events strip */}
           {upcomingEvents.length > 0 && (
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingTop: '2px' }}>
               {upcomingEvents.map(s => (
-                <div key={s.id} onClick={() => setShowSettings(true)} style={{ flexShrink: 0, background: 'rgba(225,48,108,.08)', border: '1px solid rgba(225,48,108,.2)', borderRadius: '8px', padding: '5px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '12px' }}>📅</span>
+                <div key={s.id} style={{ flexShrink: 0, background: 'rgba(225,48,108,.08)', border: '1px solid rgba(225,48,108,.2)', borderRadius: '8px', padding: '5px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '11px' }}>📅</span>
                   <div>
                     <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text1)' }}>{s.title}</div>
                     <div style={{ fontSize: '10px', color: 'var(--text3)' }}>{formatEventDate(s.starts_at)}</div>
                   </div>
                   <button onClick={e => { e.stopPropagation(); toggleRsvp(s.id) }} style={{ background: rsvpIds.has(s.id) ? 'var(--accent)' : 'var(--bg3)', border: `1px solid ${rsvpIds.has(s.id) ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '6px', color: rsvpIds.has(s.id) ? '#fff' : 'var(--text3)', fontSize: '10px', padding: '2px 7px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '600' }}>
-                    {rsvpIds.has(s.id) ? '✓ Going' : 'RSVP'}
+                    {rsvpIds.has(s.id) ? '✓' : 'RSVP'}
                   </button>
                 </div>
               ))}
@@ -544,20 +566,20 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
           )}
         </div>
 
-        {/* Pinned message */}
+        {/* Pinned */}
         {pinnedMsg && (
           <div style={{ padding: '7px 14px', background: 'rgba(99,102,241,.07)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-            <span style={{ fontSize: '13px', flexShrink: 0 }}>📌</span>
+            <span style={{ fontSize: '12px', flexShrink: 0 }}>📌</span>
             <div style={{ flex: 1, fontSize: '12px', color: 'var(--text2)', lineHeight: '1.5' }}>{pinnedMsg.content}</div>
             {isMod && <button onClick={unpinMessage} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '16px' }}>×</button>}
           </div>
         )}
 
         {/* Messages */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {messages.length === 0 && (
             <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text3)' }}>
-              <div style={{ fontSize: '32px', marginBottom: '10px' }}>{room.icon_url ? <img src={room.icon_url} style={{ width: '48px', height: '48px', borderRadius: '10px' }} alt="" /> : room.emoji}</div>
+              <div style={{ fontSize: '32px', marginBottom: '10px' }}>{room.emoji}</div>
               <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '4px', color: 'var(--text2)' }}>Welcome to {room.name}</div>
               <div style={{ fontSize: '13px' }}>Be the first to say something!</div>
             </div>
@@ -569,29 +591,70 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
             const memberInfo = members.find((m: any) => m.user_id === msg.user_id)
             const isFounder = msg.user_id === room.created_by
             const isModMsg = memberInfo?.is_moderator
+            const reactionGroups = getReactionGroups(msg.id)
+            const hasReactions = Object.keys(reactionGroups).length > 0
+
             return (
               <div key={msg.id} style={{ display: 'flex', gap: '8px', flexDirection: isMe ? 'row-reverse' : 'row' }}>
                 {!isMe && (
-                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: color, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: color, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff', marginTop: '16px' }}>
                     {name.charAt(0).toUpperCase()}
                   </div>
                 )}
-                <div style={{ maxWidth: '72%' }}>
+                <div style={{ maxWidth: '75%' }}>
                   {!isMe && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px' }}>
                       <span style={{ fontSize: '11px', color: 'var(--text3)', fontWeight: '500' }}>{name}</span>
-                      {isFounder && <span style={{ fontSize: '9px', background: 'var(--ig-gradient)', color: '#fff', padding: '0 4px', borderRadius: '3px', fontWeight: '700' }}>👑</span>}
+                      {isFounder && <span style={{ fontSize: '9px', background: 'var(--ig-gradient)', color: '#fff', padding: '0 4px', borderRadius: '3px' }}>👑</span>}
                       {!isFounder && isModMsg && <span style={{ fontSize: '9px', background: 'rgba(99,102,241,.2)', color: 'var(--accent2)', padding: '0 4px', borderRadius: '3px' }}>🛡</span>}
                       <span style={{ fontSize: '9px', color: 'var(--text3)' }}>{timeAgo(msg.created_at)}</span>
                     </div>
                   )}
-                  <div
-                    onContextMenu={e => {
-                      if (isMod || isMe) { e.preventDefault(); setContextMenu({ msgId: msg.id, x: e.clientX, y: e.clientY, content: msg.content }) }
-                    }}
-                    style={{ padding: '8px 12px', borderRadius: isMe ? '13px 13px 4px 13px' : '13px 13px 13px 4px', background: isMe ? 'var(--accent)' : 'var(--bg3)', color: isMe ? '#fff' : 'var(--text2)', border: isMe ? 'none' : '1px solid var(--border)', fontSize: '13px', lineHeight: '1.6', wordBreak: 'break-word', cursor: (isMod || isMe) ? 'context-menu' : 'default' }}>
-                    {msg.content}
+                  <div style={{ position: 'relative' }}>
+                    <div
+                      onContextMenu={e => {
+                        if (isMod || isMe) { e.preventDefault(); setContextMenu({ msgId: msg.id, x: e.clientX, y: e.clientY, content: msg.content }) }
+                      }}
+                      onDoubleClick={() => joined && setShowReactionPicker(msg.id)}
+                      style={{ padding: '8px 12px', borderRadius: isMe ? '13px 13px 4px 13px' : '13px 13px 13px 4px', background: isMe ? 'var(--accent)' : 'var(--bg3)', color: isMe ? '#fff' : 'var(--text2)', border: isMe ? 'none' : '1px solid var(--border)', fontSize: '13px', lineHeight: '1.6', wordBreak: 'break-word', cursor: 'default' }}>
+                      {msg.content}
+                    </div>
+
+                    {/* Reaction picker button */}
+                    {joined && (
+                      <button onClick={e => { e.stopPropagation(); setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id) }}
+                        style={{ position: 'absolute', top: '-8px', [isMe ? 'left' : 'right']: '-8px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '11px', opacity: 0.7 }}>
+                        😊
+                      </button>
+                    )}
+
+                    {/* Reaction picker popup */}
+                    {showReactionPicker === msg.id && (
+                      <div style={{ position: 'absolute', [isMe ? 'right' : 'left']: '0', bottom: '100%', marginBottom: '4px', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '24px', padding: '6px 10px', display: 'flex', gap: '6px', zIndex: 100, boxShadow: '0 4px 16px rgba(0,0,0,.4)', whiteSpace: 'nowrap' }}>
+                        {REACTION_EMOJIS.map(emoji => {
+                          const isMine = reactionGroups[emoji]?.mine
+                          return (
+                            <button key={emoji} onClick={e => { e.stopPropagation(); toggleReaction(msg.id, emoji) }}
+                              style={{ background: isMine ? 'var(--bg3)' : 'none', border: 'none', cursor: 'pointer', fontSize: '18px', padding: '2px', borderRadius: '6px', transform: isMine ? 'scale(1.2)' : 'scale(1)', transition: 'transform .1s' }}>
+                              {emoji}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Reactions display */}
+                  {hasReactions && (
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                      {Object.entries(reactionGroups).map(([emoji, { count, mine }]: [string, any]) => (
+                        <button key={emoji} onClick={() => toggleReaction(msg.id, emoji)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '2px 7px', background: mine ? 'rgba(99,102,241,.15)' : 'var(--bg3)', border: `1px solid ${mine ? 'var(--accent2)' : 'var(--border)'}`, borderRadius: '12px', cursor: 'pointer', fontSize: '12px', color: 'var(--text2)', fontFamily: 'inherit' }}>
+                          {emoji} <span style={{ fontSize: '11px', color: mine ? 'var(--accent2)' : 'var(--text3)' }}>{count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )
@@ -602,7 +665,8 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
         {/* Context menu */}
         {contextMenu && (
           <div style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x, background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: '10px', padding: '6px', zIndex: 500, minWidth: '160px', boxShadow: '0 8px 24px rgba(0,0,0,.4)' }}>
-            {isMod && <button onClick={() => { setPinInput(contextMenu.content); setShowPinInput(true); setContextMenu(null) }} style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--text2)', fontSize: '13px', cursor: 'pointer', textAlign: 'left', borderRadius: '6px', fontFamily: 'inherit' }}>📌 Pin message</button>}
+            {isMod && <button onClick={() => { setPinInput(contextMenu.content); setShowPinInput(true); setContextMenu(null) }} style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--text2)', fontSize: '13px', cursor: 'pointer', textAlign: 'left', borderRadius: '6px', fontFamily: 'inherit' }}>📌 Pin</button>}
+            <button onClick={() => { setShowReactionPicker(contextMenu.msgId); setContextMenu(null) }} style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--text2)', fontSize: '13px', cursor: 'pointer', textAlign: 'left', borderRadius: '6px', fontFamily: 'inherit' }}>😊 React</button>
             <button onClick={() => deleteMessage(contextMenu.msgId)} style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--red)', fontSize: '13px', cursor: 'pointer', textAlign: 'left', borderRadius: '6px', fontFamily: 'inherit' }}>🗑 Delete</button>
           </div>
         )}
@@ -611,7 +675,7 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
         <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', background: 'var(--bg0)', flexShrink: 0 }}>
           {!joined ? (
             <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '13px' }}>
-              {room.join_mode === 'invite_only' ? '🔒 Invite only room' : 'Join to send messages'}
+              {room.join_mode === 'invite_only' ? '🔒 Invite only room' : 'Join to participate'}
             </div>
           ) : (
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'var(--bg3)', borderRadius: '24px', padding: '8px 8px 8px 16px' }}>
@@ -626,7 +690,7 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
 
       {/* Members panel */}
       {showMembers && (
-        <div style={{ width: '200px', borderLeft: '1px solid var(--border)', background: 'var(--bg0)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        <div style={{ width: '190px', borderLeft: '1px solid var(--border)', background: 'var(--bg0)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
           <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', textTransform: 'uppercase' }}>Members · {memberCount}</div>
             <button onClick={() => setShowMembers(false)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '16px' }}>×</button>
@@ -641,10 +705,10 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
                   onMouseOver={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
                   onMouseOut={e => (e.currentTarget as HTMLElement).style.background = 'none'}
                 >
-                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: getColor(mname), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: '#fff' }}>{mname.charAt(0).toUpperCase()}</div>
+                  <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: getColor(mname), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff' }}>{mname.charAt(0).toUpperCase()}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '12px', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mname}</div>
-                    <div style={{ fontSize: '10px', color: 'var(--text3)' }}>{mIsOwner ? '👑' : mIsMod ? '🛡 Mod' : 'Member'}</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text3)' }}>{mIsOwner ? '👑' : mIsMod ? '🛡' : ''}</div>
                   </div>
                   {isOwner && m.user_id !== currentUser.id && (
                     <div style={{ display: 'flex', gap: '2px' }}>
@@ -661,138 +725,119 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
 
       {/* Settings Modal */}
       {showSettings && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(8px)', zIndex: 900, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '20px', overflowY: 'auto' }} onClick={e => e.target === e.currentTarget && setShowSettings(false)}>
-          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '16px', width: '100%', maxWidth: '500px', overflow: 'hidden', marginTop: '20px' }} className="fade-up">
-            {/* Tabs */}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(8px)', zIndex: 900, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }} onClick={e => e.target === e.currentTarget && setShowSettings(false)}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '16px', width: '100%', maxWidth: '500px', overflow: 'hidden', marginTop: '16px' }} className="fade-up">
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', overflowX: 'auto' }}>
-              {([['general','⚙️ General'], ['schedule','📅 Schedule'], ['members','👥 Members'], ['invite','🔗 Invite'], ...(isOwner ? [['analytics','📊 Analytics']] : [])] as [string,string][]).map(([id, label]) => (
-                <button key={id} onClick={() => setSettingsTab(id as any)} style={{ padding: '12px 14px', background: 'none', border: 'none', color: settingsTab === id ? 'var(--text1)' : 'var(--text3)', borderBottom: `2px solid ${settingsTab === id ? 'var(--accent)' : 'transparent'}`, fontSize: '12px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>{label}</button>
+              {([['general','⚙️ General'], ['schedule','📅 Events'], ['members','👥 Members'], ['invite','🔗 Invite'], ...(isOwner ? [['analytics','📊 Analytics']] : [])] as [string,string][]).map(([id, label]) => (
+                <button key={id} onClick={() => setSettingsTab(id as any)} style={{ padding: '11px 12px', background: 'none', border: 'none', color: settingsTab === id ? 'var(--text1)' : 'var(--text3)', borderBottom: `2px solid ${settingsTab === id ? 'var(--accent)' : 'transparent'}`, fontSize: '12px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>{label}</button>
               ))}
-              <button onClick={() => setShowSettings(false)} style={{ marginLeft: 'auto', padding: '12px 14px', background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '18px' }}>×</button>
+              <button onClick={() => setShowSettings(false)} style={{ marginLeft: 'auto', padding: '11px 14px', background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '18px' }}>×</button>
             </div>
 
-            <div style={{ padding: '20px', maxHeight: '70vh', overflowY: 'auto' }}>
+            <div style={{ padding: '18px', maxHeight: '72vh', overflowY: 'auto' }}>
 
-              {/* General tab */}
               {settingsTab === 'general' && (
                 <div>
+                  {/* Rules always shown first */}
+                  {room.rules && !isOwner && (
+                    <div style={{ marginBottom: '16px', background: 'var(--bg3)', borderRadius: '10px', padding: '12px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '6px' }}>📋 Room Rules</div>
+                      <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{room.rules}</div>
+                    </div>
+                  )}
                   {isOwner && (
                     <>
-                      {/* Cover + Icon */}
-                      <div style={{ marginBottom: '16px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '8px' }}>Room Identity</div>
-                        <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                          <button onClick={() => iconInputRef.current?.click()} style={{ flex: 1, padding: '10px', background: 'var(--bg3)', border: '1px dashed var(--border2)', borderRadius: '10px', color: 'var(--text3)', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>
-                            {room.icon_url ? <img src={room.icon_url} style={{ width: '32px', height: '32px', borderRadius: '6px' }} alt="" /> : '🖼️'} Change Icon
-                          </button>
-                          <button onClick={() => coverInputRef.current?.click()} style={{ flex: 1, padding: '10px', background: 'var(--bg3)', border: '1px dashed var(--border2)', borderRadius: '10px', color: 'var(--text3)', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>
-                            📷 Change Cover
-                          </button>
-                        </div>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                        <button onClick={() => iconInputRef.current?.click()} style={{ flex: 1, padding: '9px', background: 'var(--bg3)', border: '1px dashed var(--border2)', borderRadius: '9px', color: 'var(--text3)', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>
+                          {room.icon_url ? <img src={room.icon_url} style={{ width: '24px', height: '24px', borderRadius: '5px', verticalAlign: 'middle' }} alt="" /> : '🖼️'} Icon
+                        </button>
+                        <button onClick={() => coverInputRef.current?.click()} style={{ flex: 1, padding: '9px', background: 'var(--bg3)', border: '1px dashed var(--border2)', borderRadius: '9px', color: 'var(--text3)', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>📷 Cover</button>
                       </div>
-
-                      {[{label:'Room Name', key:'name'}, {label:'Description', key:'description'}, {label:'Slug (URL)', key:'slug', hint:'rooms.com/rooms/slug'}].map(f => (
-                        <div key={f.key} style={{ marginBottom: '12px' }}>
-                          <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>{f.label}</label>
-                          <input value={(settingsForm as any)[f.key]} onChange={e => setSettingsForm(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.hint || ''} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
+                      {[{label:'Name', key:'name'}, {label:'Description', key:'description'}, {label:'Slug (URL)', key:'slug'}].map(f => (
+                        <div key={f.key} style={{ marginBottom: '10px' }}>
+                          <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', display: 'block', marginBottom: '3px', textTransform: 'uppercase' }}>{f.label}</label>
+                          <input value={(settingsForm as any)[f.key]} onChange={e => setSettingsForm(prev => ({ ...prev, [f.key]: e.target.value }))} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 11px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
                         </div>
                       ))}
-
-                      <div style={{ marginBottom: '12px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Visibility</label>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          {[['false','🌐 Public'],['true','🔒 Private']].map(([val, label]) => (
-                            <button key={val} onClick={() => setSettingsForm(prev => ({ ...prev, is_private: val === 'true' }))} style={{ flex: 1, padding: '8px', background: String(settingsForm.is_private) === val ? 'rgba(225,48,108,.12)' : 'var(--bg3)', border: `1px solid ${String(settingsForm.is_private) === val ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '8px', color: String(settingsForm.is_private) === val ? 'var(--accent)' : 'var(--text2)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>{label}</button>
-                          ))}
-                        </div>
+                      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+                        {[['false','🌐 Public'],['true','🔒 Private']].map(([val, label]) => (
+                          <button key={val} onClick={() => setSettingsForm(prev => ({ ...prev, is_private: val === 'true' }))} style={{ flex: 1, padding: '7px', background: String(settingsForm.is_private) === val ? 'rgba(225,48,108,.12)' : 'var(--bg3)', border: `1px solid ${String(settingsForm.is_private) === val ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '8px', color: String(settingsForm.is_private) === val ? 'var(--accent)' : 'var(--text2)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>{label}</button>
+                        ))}
                       </div>
-
-                      <div style={{ marginBottom: '12px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Join Mode</label>
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          {[['open','🚪 Open'],['request','✋ Request'],['invite_only','🔗 Invite Only']].map(([val, label]) => (
-                            <button key={val} onClick={() => setSettingsForm(prev => ({ ...prev, join_mode: val }))} style={{ flex: 1, padding: '8px', background: settingsForm.join_mode === val ? 'rgba(225,48,108,.12)' : 'var(--bg3)', border: `1px solid ${settingsForm.join_mode === val ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '8px', color: settingsForm.join_mode === val ? 'var(--accent)' : 'var(--text2)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit', minWidth: '80px' }}>{label}</button>
-                          ))}
-                        </div>
+                      <div style={{ display: 'flex', gap: '5px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                        {[['open','🚪 Open'],['request','✋ Request'],['invite_only','🔗 Invite Only']].map(([val, label]) => (
+                          <button key={val} onClick={() => setSettingsForm(prev => ({ ...prev, join_mode: val }))} style={{ flex: 1, padding: '7px', background: settingsForm.join_mode === val ? 'rgba(225,48,108,.12)' : 'var(--bg3)', border: `1px solid ${settingsForm.join_mode === val ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '8px', color: settingsForm.join_mode === val ? 'var(--accent)' : 'var(--text2)', fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit', minWidth: '70px' }}>{label}</button>
+                        ))}
                       </div>
-
-                      <div style={{ marginBottom: '16px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Max Members</label>
-                        <select value={settingsForm.max_members || ''} onChange={e => setSettingsForm(prev => ({ ...prev, max_members: e.target.value }))} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }}>
+                      <div style={{ marginBottom: '10px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', display: 'block', marginBottom: '3px', textTransform: 'uppercase' }}>Max Members</label>
+                        <select value={settingsForm.max_members || ''} onChange={e => setSettingsForm(prev => ({ ...prev, max_members: e.target.value }))} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 11px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }}>
                           <option value="">Unlimited</option>
                           {[10,25,50,100,250,500].map(n => <option key={n} value={n}>{n} members</option>)}
                         </select>
                       </div>
-
-                      <div style={{ marginBottom: '16px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Room Rules</label>
-                        <textarea value={rules} onChange={e => setRules(e.target.value)} rows={3} placeholder="Set rules for your room…" style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text1)', fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
+                      <div style={{ marginBottom: '14px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', display: 'block', marginBottom: '3px', textTransform: 'uppercase' }}>Room Rules</label>
+                        <textarea value={rules} onChange={e => setRules(e.target.value)} rows={3} placeholder="Set rules shown to new members before they join…" style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text1)', fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
+                        <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '4px' }}>Members will see and accept these rules before joining</div>
                       </div>
-
-                      <div style={{ marginBottom: '16px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Pinned Message</label>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <input value={pinInput || pinnedMsg?.content || ''} onChange={e => setPinInput(e.target.value)} placeholder="Pin a message to top of chat…" style={{ flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
-                          <button onClick={() => pinMessage(pinInput || pinnedMsg?.content || '')} style={{ padding: '8px 14px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', cursor: 'pointer' }}>Pin</button>
+                      <div style={{ marginBottom: '14px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', display: 'block', marginBottom: '3px', textTransform: 'uppercase' }}>Pinned Message</label>
+                        <div style={{ display: 'flex', gap: '7px' }}>
+                          <input value={pinInput || pinnedMsg?.content || ''} onChange={e => setPinInput(e.target.value)} placeholder="Pin a message to top of chat…" style={{ flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 11px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
+                          <button onClick={() => pinMessage(pinInput || pinnedMsg?.content || '')} style={{ padding: '7px 13px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', cursor: 'pointer' }}>Pin</button>
                         </div>
                       </div>
-
                       <button onClick={saveRoomSettings} style={{ width: '100%', padding: '11px', background: 'var(--ig-gradient)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>Save Changes</button>
                     </>
-                  )}
-                  {!isOwner && rules && (
-                    <div>
-                      <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '8px' }}>Room Rules</div>
-                      <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '12px', fontSize: '13px', color: 'var(--text2)', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{rules}</div>
-                    </div>
                   )}
                 </div>
               )}
 
-              {/* Schedule tab */}
               {settingsTab === 'schedule' && (
                 <div>
                   {isMod && (
-                    <button onClick={() => setShowNewEvent(!showNewEvent)} style={{ width: '100%', padding: '10px', background: 'rgba(225,48,108,.1)', border: '1px solid rgba(225,48,108,.2)', borderRadius: '10px', color: 'var(--accent)', fontSize: '13px', fontWeight: '600', cursor: 'pointer', marginBottom: '16px', fontFamily: 'inherit' }}>
-                      + Schedule New Event
+                    <button onClick={() => setShowNewEvent(!showNewEvent)} style={{ width: '100%', padding: '10px', background: 'rgba(225,48,108,.1)', border: '1px solid rgba(225,48,108,.2)', borderRadius: '10px', color: 'var(--accent)', fontSize: '13px', fontWeight: '600', cursor: 'pointer', marginBottom: '14px', fontFamily: 'inherit' }}>
+                      + Schedule Event
                     </button>
                   )}
                   {showNewEvent && (
-                    <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
+                    <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px', marginBottom: '14px' }}>
                       {[{label:'Title', key:'title', type:'text'}, {label:'Description', key:'description', type:'text'}, {label:'Date & Time', key:'starts_at', type:'datetime-local'}].map(f => (
-                        <div key={f.key} style={{ marginBottom: '10px' }}>
+                        <div key={f.key} style={{ marginBottom: '9px' }}>
                           <label style={{ fontSize: '11px', color: 'var(--text3)', display: 'block', marginBottom: '3px' }}>{f.label}</label>
                           <input type={f.type} value={(eventForm as any)[f.key]} onChange={e => setEventForm(prev => ({ ...prev, [f.key]: e.target.value }))} style={{ width: '100%', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: '7px', padding: '7px 10px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
                         </div>
                       ))}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                        <input type="checkbox" id="recurring" checked={eventForm.is_recurring} onChange={e => setEventForm(prev => ({ ...prev, is_recurring: e.target.checked }))} />
-                        <label htmlFor="recurring" style={{ fontSize: '13px', color: 'var(--text2)', cursor: 'pointer' }}>Recurring event</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '9px' }}>
+                        <input type="checkbox" id="rec" checked={eventForm.is_recurring} onChange={e => setEventForm(prev => ({ ...prev, is_recurring: e.target.checked }))} />
+                        <label htmlFor="rec" style={{ fontSize: '13px', color: 'var(--text2)', cursor: 'pointer' }}>Recurring</label>
                       </div>
                       {eventForm.is_recurring && (
-                        <select value={eventForm.recurrence} onChange={e => setEventForm(prev => ({ ...prev, recurrence: e.target.value }))} style={{ width: '100%', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: '7px', padding: '7px 10px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit', marginBottom: '10px' }}>
+                        <select value={eventForm.recurrence} onChange={e => setEventForm(prev => ({ ...prev, recurrence: e.target.value }))} style={{ width: '100%', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: '7px', padding: '7px 10px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit', marginBottom: '9px' }}>
                           <option value="daily">Daily</option>
                           <option value="weekly">Weekly</option>
                           <option value="monthly">Monthly</option>
                         </select>
                       )}
-                      <button onClick={createEvent} style={{ width: '100%', padding: '9px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>Create Event</button>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '9px' }}>📣 All room followers will be notified</div>
+                      <button onClick={createEvent} style={{ width: '100%', padding: '9px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>Create Event & Notify</button>
                     </div>
                   )}
-                  {schedules.length === 0 && <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text3)', fontSize: '13px' }}>No events scheduled yet</div>}
+                  {schedules.length === 0 && <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text3)', fontSize: '13px' }}>No events yet</div>}
                   {schedules.map(s => (
                     <div key={s.id} style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '12px', marginBottom: '10px' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
                         <div>
-                          <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '3px' }}>{s.title}</div>
-                          {s.description && <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>{s.description}</div>}
+                          <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '2px' }}>{s.title}</div>
+                          {s.description && <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '3px' }}>{s.description}</div>}
                           <div style={{ fontSize: '11px', color: 'var(--accent)' }}>📅 {formatEventDate(s.starts_at)}{s.is_recurring && ` · ${s.recurrence}`}</div>
                         </div>
-                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                          <button onClick={() => toggleRsvp(s.id)} style={{ padding: '5px 12px', background: rsvpIds.has(s.id) ? 'var(--accent)' : 'var(--bg4)', border: `1px solid ${rsvpIds.has(s.id) ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '7px', color: rsvpIds.has(s.id) ? '#fff' : 'var(--text2)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '600' }}>
+                        <div style={{ display: 'flex', gap: '5px', flexShrink: 0 }}>
+                          <button onClick={() => toggleRsvp(s.id)} style={{ padding: '4px 10px', background: rsvpIds.has(s.id) ? 'var(--accent)' : 'var(--bg4)', border: `1px solid ${rsvpIds.has(s.id) ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '7px', color: rsvpIds.has(s.id) ? '#fff' : 'var(--text2)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '600' }}>
                             {rsvpIds.has(s.id) ? '✓ Going' : 'RSVP'}
                           </button>
-                          {(isMod || s.created_by === currentUser.id) && <button onClick={() => deleteEvent(s.id)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '16px' }}>🗑</button>}
+                          {(isMod || s.created_by === currentUser.id) && <button onClick={() => deleteEvent(s.id)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '15px' }}>🗑</button>}
                         </div>
                       </div>
                     </div>
@@ -800,30 +845,29 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
                 </div>
               )}
 
-              {/* Members tab */}
               {settingsTab === 'members' && (
                 <div>
                   {joinRequests.length > 0 && (
-                    <div style={{ marginBottom: '16px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '8px' }}>Join Requests ({joinRequests.length})</div>
+                    <div style={{ marginBottom: '14px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '7px' }}>Requests ({joinRequests.length})</div>
                       {joinRequests.map(req => (
-                        <div key={req.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'var(--bg3)', borderRadius: '10px', marginBottom: '8px' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: getColor(req.profiles?.name || 'U'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: '#fff' }}>{(req.profiles?.name || 'U').charAt(0).toUpperCase()}</div>
+                        <div key={req.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'var(--bg3)', borderRadius: '10px', marginBottom: '7px' }}>
+                          <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: getColor(req.profiles?.name || 'U'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: '#fff' }}>{(req.profiles?.name || 'U').charAt(0).toUpperCase()}</div>
                           <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500' }}>{req.profiles?.name}</div></div>
-                          <button onClick={() => approveJoinRequest(req.id, req.user_id)} style={{ padding: '5px 12px', background: 'rgba(34,197,94,.15)', border: '1px solid rgba(34,197,94,.3)', borderRadius: '7px', color: 'var(--green)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>Accept</button>
-                          <button onClick={() => rejectJoinRequest(req.id)} style={{ padding: '5px 12px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '7px', color: 'var(--red)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>Reject</button>
+                          <button onClick={() => approveJoinRequest(req.id, req.user_id)} style={{ padding: '4px 10px', background: 'rgba(34,197,94,.15)', border: '1px solid rgba(34,197,94,.3)', borderRadius: '7px', color: 'var(--green)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>Accept</button>
+                          <button onClick={() => rejectJoinRequest(req.id)} style={{ padding: '4px 10px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '7px', color: 'var(--red)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>Reject</button>
                         </div>
                       ))}
                     </div>
                   )}
-                  <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '8px' }}>All Members ({memberCount})</div>
+                  <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '7px' }}>All Members ({memberCount})</div>
                   {members.map((m: any) => {
                     const mname = m.profiles?.name || 'Unknown'
                     const mIsOwner = m.user_id === room.created_by
                     const mIsMod = m.is_moderator
                     return (
                       <div key={m.id || m.user_id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 10px', background: 'var(--bg3)', borderRadius: '10px', marginBottom: '6px' }}>
-                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: getColor(mname), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: '#fff' }}>{mname.charAt(0).toUpperCase()}</div>
+                        <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: getColor(mname), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: '#fff' }}>{mname.charAt(0).toUpperCase()}</div>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             {mname}
@@ -833,9 +877,9 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
                           <div style={{ fontSize: '10px', color: 'var(--text3)' }}>{mIsOwner ? 'Founder' : mIsMod ? 'Moderator' : 'Member'}</div>
                         </div>
                         {isOwner && m.user_id !== currentUser.id && (
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            <button onClick={() => toggleModerator(m.user_id, mIsMod)} style={{ padding: '4px 10px', background: mIsMod ? 'rgba(99,102,241,.15)' : 'var(--bg4)', border: `1px solid ${mIsMod ? 'var(--accentbdr)' : 'var(--border)'}`, borderRadius: '6px', color: mIsMod ? 'var(--accent2)' : 'var(--text3)', fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit' }}>{mIsMod ? '🛡 Mod' : 'Make Mod'}</button>
-                            <button onClick={() => kickMember(m.user_id)} style={{ padding: '4px 10px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '6px', color: 'var(--red)', fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit' }}>Remove</button>
+                          <div style={{ display: 'flex', gap: '5px' }}>
+                            <button onClick={() => toggleModerator(m.user_id, mIsMod)} style={{ padding: '4px 8px', background: mIsMod ? 'rgba(99,102,241,.15)' : 'var(--bg4)', border: `1px solid ${mIsMod ? 'rgba(99,102,241,.3)' : 'var(--border)'}`, borderRadius: '6px', color: mIsMod ? 'var(--accent2)' : 'var(--text3)', fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit' }}>{mIsMod ? '🛡 Mod' : 'Mod'}</button>
+                            <button onClick={() => kickMember(m.user_id)} style={{ padding: '4px 8px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '6px', color: 'var(--red)', fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit' }}>Remove</button>
                           </div>
                         )}
                       </div>
@@ -844,16 +888,15 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
                 </div>
               )}
 
-              {/* Invite tab */}
               {settingsTab === 'invite' && (
                 <div>
-                  <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '16px', lineHeight: '1.6' }}>Share this link to invite people to {room.name}. Anyone with the link can join.</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '14px', lineHeight: '1.6' }}>Share this link to invite people to {room.name}.</div>
                   {inviteCode ? (
                     <>
-                      <div style={{ background: 'var(--bg3)', borderRadius: '8px', padding: '12px', fontSize: '13px', color: 'var(--text2)', marginBottom: '10px', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                      <div style={{ background: 'var(--bg3)', borderRadius: '8px', padding: '11px', fontSize: '12px', color: 'var(--text2)', marginBottom: '9px', fontFamily: 'monospace', wordBreak: 'break-all' }}>
                         {typeof window !== 'undefined' ? window.location.origin : ''}/invite/{inviteCode}
                       </div>
-                      <button onClick={copyInvite} style={{ width: '100%', padding: '10px', background: copied ? 'rgba(34,197,94,.15)' : 'var(--ig-gradient)', border: `1px solid ${copied ? 'rgba(34,197,94,.3)' : 'none'}`, borderRadius: '10px', color: copied ? 'var(--green)' : '#fff', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      <button onClick={copyInvite} style={{ width: '100%', padding: '10px', background: copied ? 'rgba(34,197,94,.15)' : 'var(--ig-gradient)', border: `1px solid ${copied ? 'rgba(34,197,94,.3)' : 'transparent'}`, borderRadius: '10px', color: copied ? 'var(--green)' : '#fff', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
                         {copied ? '✓ Copied!' : 'Copy Invite Link'}
                       </button>
                     </>
@@ -865,15 +908,8 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
                 </div>
               )}
 
-              {/* Analytics tab — Founder Dashboard */}
               {settingsTab === 'analytics' && isOwner && (
-                <FounderDashboard
-                  room={room}
-                  members={members}
-                  onlineCount={onlineCount}
-                  schedules={schedules}
-                  supabase={supabase}
-                />
+                <FounderDashboard room={room} members={members} onlineCount={onlineCount} schedules={schedules} supabase={supabase} />
               )}
             </div>
           </div>
