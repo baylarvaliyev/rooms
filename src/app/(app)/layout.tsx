@@ -58,11 +58,11 @@ const NAV = [
 ]
 
 const MOBILE_NAV = [
-  { id: 'feed',          icon: Icons.home,          path: '/feed' },
-  { id: 'explore',       icon: Icons.explore,       path: '/explore' },
-  { id: 'messages',      icon: Icons.messages,      path: '/messages' },
-  { id: 'notifications', icon: Icons.notifications, path: '/notifications' },
-  { id: 'profile',       icon: null,                path: '/profile' },
+  { id: 'feed',        icon: Icons.home,         path: '/feed' },
+  { id: 'explore',     icon: Icons.explore,      path: '/explore' },
+  { id: 'leaderboard', icon: Icons.leaderboard,  path: '/leaderboard' },
+  { id: 'messages',    icon: Icons.messages,     path: '/messages' },
+  { id: 'profile',     icon: null,               path: '/profile' },
 ]
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -151,12 +151,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {isRoom || isUser ? '' : activeId === 'feed' ? 'Rooms' : NAV.find(n => n.id === activeId)?.label || 'Rooms'}
           </div>
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            {activeId === 'feed' && (
-              <button onClick={() => router.push('/notifications')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text1)', position: 'relative', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {Icons.notifications(false)}
-                {notifCount > 0 && <div style={{ position: 'absolute', top: '8px', right: '8px', width: '8px', height: '8px', background: 'var(--red)', borderRadius: '50%', border: '1.5px solid var(--bg0)' }} />}
-              </button>
-            )}
+            {/* Notifications always visible on mobile topbar */}
+            <button onClick={() => router.push('/notifications')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text1)', position: 'relative', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {Icons.notifications(false)}
+              {notifCount > 0 && <div style={{ position: 'absolute', top: '8px', right: '8px', width: '8px', height: '8px', background: 'var(--red)', borderRadius: '50%', border: '1.5px solid var(--bg0)' }} />}
+            </button>
             {activeId === 'feed' && (
               <button onClick={() => router.push('/messages')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text1)', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {Icons.messages(false)}

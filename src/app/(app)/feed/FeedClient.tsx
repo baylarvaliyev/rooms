@@ -313,28 +313,26 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
     <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg0)' }}>
       <div style={{ maxWidth: '470px', margin: '0 auto' }}>
 
-        {/* Stories row — rooms you follow */}
-        <div style={{ display: 'flex', gap: '16px', padding: '14px 16px', overflowX: 'auto', borderBottom: '1px solid var(--border)' }}>
-          {/* Your story */}
-          <div onClick={() => setCreating(true)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer', flexShrink: 0 }}>
-            <div style={{ width: '58px', height: '58px', borderRadius: '50%', background: 'var(--bg3)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', position: 'relative' }}>
-              {profile?.avatar_url ? <img src={profile.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: '700', color: '#fff' }}>{name.charAt(0).toUpperCase()}</div>}
-              <div style={{ position: 'absolute', bottom: 0, right: 0, width: '20px', height: '20px', borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg0)', fontSize: '12px', fontWeight: '700', color: '#fff' }}>+</div>
-            </div>
-            <span style={{ fontSize: '11px', color: 'var(--text2)', maxWidth: '60px', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Your story</span>
-          </div>
-          {/* Room stories */}
-          {rooms.slice(0, 8).map((r: any) => (
-            <div key={r.id} onClick={() => router.push(`/rooms/${r.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer', flexShrink: 0 }}>
-              <div style={{ padding: '2px', background: 'var(--ig-gradient)', borderRadius: '50%' }}>
-                <div style={{ padding: '2px', background: 'var(--bg0)', borderRadius: '50%' }}>
-                  <div style={{ width: '54px', height: '54px', borderRadius: '50%', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>{r.emoji}</div>
+        {/* Stories row — rooms you joined */}
+        {rooms.length > 0 && (
+          <div style={{ display: 'flex', gap: '16px', padding: '12px 16px', overflowX: 'auto', borderBottom: '1px solid var(--border)' }}>
+            {rooms.slice(0, 10).map((r: any) => (
+              <div key={r.id} onClick={() => router.push(`/rooms/${r.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer', flexShrink: 0 }}>
+                <div style={{ padding: '2.5px', background: 'var(--ig-gradient)', borderRadius: '50%' }}>
+                  <div style={{ padding: '2px', background: 'var(--bg0)', borderRadius: '50%' }}>
+                    <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>{r.emoji}</div>
+                  </div>
                 </div>
+                <span style={{ fontSize: '10px', color: 'var(--text2)', maxWidth: '58px', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
               </div>
-              <span style={{ fontSize: '11px', color: 'var(--text2)', maxWidth: '60px', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+            ))}
+            {/* Explore more */}
+            <div onClick={() => router.push('/explore')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer', flexShrink: 0 }}>
+              <div style={{ width: '57px', height: '57px', borderRadius: '50%', background: 'var(--bg3)', border: '1.5px dashed var(--border2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>+</div>
+              <span style={{ fontSize: '10px', color: 'var(--text3)', maxWidth: '58px', textAlign: 'center', whiteSpace: 'nowrap' }}>Explore</span>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
 
         {/* New user banner */}
         {isNewUser && posts.length > 0 && (
