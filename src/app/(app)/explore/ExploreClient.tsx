@@ -6,8 +6,20 @@ import { createClient } from '@/lib/supabase'
 
 const CATEGORIES = ['All','Business','Technology','Music','Study','Travel','Art','Fitness','Finance','Cars','Lifestyle']
 
+const COLLECTIONS = [
+  { id: 'Business',   label: '🚀 Business & Startups',    emoji: '🚀' },
+  { id: 'Technology', label: '💻 Technology & AI',         emoji: '💻' },
+  { id: 'Finance',    label: '💰 Finance & Crypto',        emoji: '💰' },
+  { id: 'Music',      label: '🎵 Music & Audio',           emoji: '🎵' },
+  { id: 'Study',      label: '📚 Study & Education',       emoji: '📚' },
+  { id: 'Fitness',    label: '💪 Fitness & Health',        emoji: '💪' },
+  { id: 'Travel',     label: '✈️ Travel & Adventure',      emoji: '✈️' },
+  { id: 'Art',        label: '🎨 Art & Design',            emoji: '🎨' },
+  { id: 'Cars',       label: '🚗 Cars & Motorsport',       emoji: '🚗' },
+  { id: 'Lifestyle',  label: '🌟 Lifestyle & Culture',     emoji: '🌟' },
+]
+
 const ROOM_COLORS: Record<string, string> = {
-  Business: 'linear-gradient(135deg,#0a1e3a,#1a3a6e)',
   Technology: 'linear-gradient(135deg,#1e0a3a,#3d1a5e)',
   Music: 'linear-gradient(135deg,#3a0a1e,#6e1a3e)',
   Study: 'linear-gradient(135deg,#0a2a1a,#1a4a30)',
@@ -180,75 +192,106 @@ export default function ExploreClient() {
           <span style={{ fontSize: '12px', color: 'var(--text3)', fontWeight: '400', marginLeft: '6px' }}>{filtered.length} rooms</span>
         </div>}
 
-        {/* Grid */}
-        {loading ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
-            {[1,2,3,4,5,6].map(i => (
-              <div key={i} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '13px', overflow: 'hidden', animation: 'pulse 1.5s infinite' }}>
-                <div style={{ height: '110px', background: 'var(--bg4)' }} />
-                <div style={{ padding: '12px' }}>
-                  <div style={{ height: '13px', background: 'var(--bg4)', borderRadius: '6px', marginBottom: '8px', width: '70%' }} />
-                  <div style={{ height: '10px', background: 'var(--bg4)', borderRadius: '6px', width: '50%' }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-            <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔍</div>
-            <div style={{ fontWeight: '600', fontSize: '16px', marginBottom: '6px' }}>No rooms found</div>
-            <div style={{ fontSize: '13px', color: 'var(--text3)' }}>Be the first to create one!</div>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
-            {filtered.map(r => {
-              const badge = getActivityBadge(r.trending_score, r.member_count)
-              const isFollowing = followedRooms.has(r.id)
+        {/* Collections view — when All + no search */}
+        {!loading && cat === 'All' && !search && (
+          <div>
+            {COLLECTIONS.map(col => {
+              const colRooms = rooms.filter(r => r.category === col.id)
+              if (colRooms.length === 0) return null
               return (
-                <div key={r.id} onClick={() => { router.push(`/rooms/${r.id}`); setTimeout(() => refreshRoom(r.id), 2000) }} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '13px', overflow: 'hidden', cursor: 'pointer', transition: 'all .2s' }}
-                  onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.15)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
-                  onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.08)'; (e.currentTarget as HTMLElement).style.transform = 'none' }}
-                >
-                  {/* Room cover image — uses actual cover_url if set */}
-                  <div style={{ height: '110px', background: r.cover_url ? 'none' : (ROOM_COLORS[r.category] || 'var(--bg3)'), position: 'relative', overflow: 'hidden' }}>
-                    {r.cover_url
-                      ? <img src={r.cover_url} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
-                      : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '46px' }}>
-                          {r.icon_url ? <img src={r.icon_url} style={{ width: '52px', height: '52px', borderRadius: '12px' }} alt="" /> : r.emoji}
-                        </div>
-                    }
-                    <div style={{ position: 'absolute', top: '8px', left: '8px', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 7px', background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(8px)', borderRadius: '20px', fontSize: '10px', color: '#fff' }}>
-                      <span className="live-dot" style={{ width: '5px', height: '5px' }} />live
-                    </div>
-                    <div style={{ position: 'absolute', top: '8px', right: '8px', padding: '3px 7px', background: 'rgba(0,0,0,.5)', borderRadius: '20px', fontSize: '10px', color: 'rgba(255,255,255,.8)' }}>{r.type}</div>
-                    {badge && <div style={{ position: 'absolute', bottom: '8px', left: '8px', fontSize: '10px', fontWeight: '700', color: '#fff', background: 'rgba(0,0,0,.6)', padding: '2px 6px', borderRadius: '4px' }}>{badge.label}</div>}
-                    {/* Room icon overlay bottom-right */}
-                    {r.icon_url && r.cover_url && (
-                      <div style={{ position: 'absolute', bottom: '8px', right: '8px', width: '28px', height: '28px', borderRadius: '7px', overflow: 'hidden', border: '2px solid rgba(255,255,255,.3)' }}>
-                        <img src={r.icon_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                      </div>
-                    )}
+                <div key={col.id} style={{ marginBottom: '28px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--text1)' }}>{col.label}</div>
+                    <button onClick={() => setCat(col.id)} style={{ fontSize: '12px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '500' }}>See all →</button>
                   </div>
-
-                  <div style={{ padding: '12px' }}>
-                    <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '3px', color: 'var(--text1)' }}>{r.name}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description || r.category}</div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <span style={{ fontSize: '12px', color: 'var(--text3)' }}>👥 {r.member_count || 0}</span>
-                        {(r.follower_count || 0) > 0 && <span style={{ fontSize: '12px', color: 'var(--text3)' }}>🔔 {r.follower_count}</span>}
-                      </div>
-                      {/* Follow button */}
-                      <button onClick={e => toggleFollow(e, r.id)} style={{ padding: '4px 10px', borderRadius: '20px', border: `1px solid ${isFollowing ? 'var(--border)' : 'var(--accent)'}`, background: isFollowing ? 'var(--bg3)' : 'rgba(225,48,108,.1)', color: isFollowing ? 'var(--text3)' : 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', transition: 'all .18s', fontFamily: 'inherit' }}>
-                        {isFollowing ? 'Following' : 'Follow'}
-                      </button>
-                    </div>
+                  <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
+                    {colRooms.slice(0, 6).map(r => {
+                      const badge = getActivityBadge(r.trending_score, r.member_count)
+                      const isFollowing = followedRooms.has(r.id)
+                      return (
+                        <div key={r.id} onClick={() => { router.push(`/rooms/${r.id}`); setTimeout(() => refreshRoom(r.id), 2000) }} style={{ flexShrink: 0, width: '160px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '13px', overflow: 'hidden', cursor: 'pointer', transition: 'all .2s' }}
+                          onMouseOver={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.14)' }}
+                          onMouseOut={e => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.08)' }}
+                        >
+                          <div style={{ height: '90px', background: r.cover_url ? 'none' : (ROOM_COLORS[r.category] || 'var(--bg3)'), position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px' }}>
+                            {r.cover_url
+                              ? <img src={r.cover_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                              : (r.icon_url ? <img src={r.icon_url} style={{ width: '48px', height: '48px', borderRadius: '10px' }} alt="" /> : r.emoji)
+                            }
+                            {badge && <div style={{ position: 'absolute', bottom: '5px', left: '5px', fontSize: '9px', fontWeight: '700', color: '#fff', background: 'rgba(0,0,0,.6)', padding: '2px 5px', borderRadius: '4px' }}>{badge.label}</div>}
+                            <div style={{ position: 'absolute', top: '6px', right: '6px', padding: '2px 6px', background: 'rgba(0,0,0,.5)', borderRadius: '20px', fontSize: '9px', color: 'rgba(255,255,255,.8)' }}>{r.type}</div>
+                          </div>
+                          <div style={{ padding: '10px' }}>
+                            <div style={{ fontWeight: '600', fontSize: '12px', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
+                            <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '8px' }}>👥 {r.member_count || 0}</div>
+                            <button onClick={e => toggleFollow(e, r.id)} style={{ width: '100%', padding: '4px', borderRadius: '8px', border: `1px solid ${isFollowing ? 'var(--border)' : 'var(--accent)'}`, background: isFollowing ? 'var(--bg3)' : 'rgba(225,48,108,.1)', color: isFollowing ? 'var(--text3)' : 'var(--accent)', fontSize: '10px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
+                              {isFollowing ? '✓ Following' : '+ Follow'}
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )
             })}
           </div>
+        )}
+
+        {/* Filtered grid — when category selected or searching */}
+        {(!loading && (cat !== 'All' || search)) && (
+          filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+              <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔍</div>
+              <div style={{ fontWeight: '600', fontSize: '16px', marginBottom: '6px' }}>No rooms found</div>
+              <div style={{ fontSize: '13px', color: 'var(--text3)' }}>Be the first to create one!</div>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
+              {filtered.map(r => {
+                const badge = getActivityBadge(r.trending_score, r.member_count)
+                const isFollowing = followedRooms.has(r.id)
+                return (
+                  <div key={r.id} onClick={() => { router.push(`/rooms/${r.id}`); setTimeout(() => refreshRoom(r.id), 2000) }} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '13px', overflow: 'hidden', cursor: 'pointer', transition: 'all .2s' }}
+                    onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.15)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
+                    onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.08)'; (e.currentTarget as HTMLElement).style.transform = 'none' }}
+                  >
+                    <div style={{ height: '110px', background: r.cover_url ? 'none' : (ROOM_COLORS[r.category] || 'var(--bg3)'), position: 'relative', overflow: 'hidden' }}>
+                      {r.cover_url
+                        ? <img src={r.cover_url} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
+                        : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '46px' }}>
+                            {r.icon_url ? <img src={r.icon_url} style={{ width: '52px', height: '52px', borderRadius: '12px' }} alt="" /> : r.emoji}
+                          </div>
+                      }
+                      <div style={{ position: 'absolute', top: '8px', left: '8px', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 7px', background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(8px)', borderRadius: '20px', fontSize: '10px', color: '#fff' }}>
+                        <span className="live-dot" style={{ width: '5px', height: '5px' }} />live
+                      </div>
+                      <div style={{ position: 'absolute', top: '8px', right: '8px', padding: '3px 7px', background: 'rgba(0,0,0,.5)', borderRadius: '20px', fontSize: '10px', color: 'rgba(255,255,255,.8)' }}>{r.type}</div>
+                      {badge && <div style={{ position: 'absolute', bottom: '8px', left: '8px', fontSize: '10px', fontWeight: '700', color: '#fff', background: 'rgba(0,0,0,.6)', padding: '2px 6px', borderRadius: '4px' }}>{badge.label}</div>}
+                      {r.icon_url && r.cover_url && (
+                        <div style={{ position: 'absolute', bottom: '8px', right: '8px', width: '28px', height: '28px', borderRadius: '7px', overflow: 'hidden', border: '2px solid rgba(255,255,255,.3)' }}>
+                          <img src={r.icon_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ padding: '12px' }}>
+                      <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '3px' }}>{r.name}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description || r.category}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--text3)' }}>👥 {r.member_count || 0}</span>
+                          {(r.follower_count || 0) > 0 && <span style={{ fontSize: '12px', color: 'var(--text3)' }}>🔔 {r.follower_count}</span>}
+                        </div>
+                        <button onClick={e => toggleFollow(e, r.id)} style={{ padding: '4px 10px', borderRadius: '20px', border: `1px solid ${isFollowing ? 'var(--border)' : 'var(--accent)'}`, background: isFollowing ? 'var(--bg3)' : 'rgba(225,48,108,.1)', color: isFollowing ? 'var(--text3)' : 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
+                          {isFollowing ? 'Following' : 'Follow'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )
         )}
       </div>
 
