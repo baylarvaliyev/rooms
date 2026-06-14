@@ -70,14 +70,44 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const supabase = createClient()
   const [profile, setProfile] = useState<any>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [notifCount, setNotifCount] = useState(0)
   const [dmCount, setDmCount] = useState(0)
+
+  // SECURITY: Detect if user changes mid-session (e.g. someone signs up on same browser)
+  // If the auth user changes, clear state and redirect to login immediately
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const newUserId = session?.user?.id || null
+
+      if (event === 'SIGNED_OUT') {
+        setProfile(null)
+        setCurrentUserId(null)
+        router.push('/login')
+        return
+      }
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (currentUserId && newUserId && newUserId !== currentUserId) {
+          // Different user logged in on same browser — force full page reload
+          // This clears all React state and prevents session mixing
+          window.location.href = '/feed'
+          return
+        }
+        if (newUserId && !currentUserId) {
+          setCurrentUserId(newUserId)
+        }
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [currentUserId])
 
   useEffect(() => {
     let channel: any = null
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
+      setCurrentUserId(user.id)
       if (!profile) {
         const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
         setProfile(data)

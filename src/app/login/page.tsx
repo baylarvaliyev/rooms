@@ -20,6 +20,8 @@ export default function LoginPage() {
     setError('')
 
     if (mode === 'signup') {
+      // Sign out any existing session first to prevent session mixing
+      await supabase.auth.signOut()
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
