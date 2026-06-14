@@ -380,23 +380,38 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
     <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg0)' }}>
       <div style={{ maxWidth: '470px', margin: '0 auto' }}>
 
-        {/* Stories row — rooms you joined */}
+        {/* Rooms row — square tiles with neon borders */}
         {rooms.length > 0 && (
-          <div style={{ display: 'flex', gap: '16px', padding: '12px 16px', overflowX: 'auto', borderBottom: '1px solid var(--border)' }}>
-            {rooms.slice(0, 10).map((r: any) => (
-              <div key={r.id} onClick={() => router.push(`/rooms/${r.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer', flexShrink: 0 }}>
-                <div style={{ padding: '2.5px', background: 'var(--ig-gradient)', borderRadius: '50%' }}>
-                  <div style={{ padding: '2px', background: 'var(--bg0)', borderRadius: '50%' }}>
-                    <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>{r.emoji}</div>
+          <div style={{ borderBottom: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em', padding: '10px 16px 6px' }}>Your Rooms</div>
+            <div style={{ display: 'flex', gap: '10px', padding: '0 16px 12px', overflowX: 'auto' }}>
+              {rooms.slice(0, 10).map((r: any, i: number) => {
+                // Each room gets a different neon color
+                const neons = [
+                  '#ff2d78', '#00f5ff', '#39ff14', '#ff6700', '#bf00ff',
+                  '#ffff00', '#ff073a', '#00ffcc', '#ff00ff', '#0ff'
+                ]
+                const neon = neons[i % neons.length]
+                return (
+                  <div key={r.id} onClick={() => router.push(`/rooms/${r.id}`)} style={{ flexShrink: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
+                    <div style={{ width: '62px', height: '62px', borderRadius: '14px', border: `2px solid ${neon}`, boxShadow: `0 0 10px ${neon}55, 0 0 20px ${neon}22`, overflow: 'hidden', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', transition: 'box-shadow .2s', flexShrink: 0 }}
+                      onMouseOver={e => (e.currentTarget as HTMLElement).style.boxShadow = `0 0 16px ${neon}99, 0 0 32px ${neon}44`}
+                      onMouseOut={e => (e.currentTarget as HTMLElement).style.boxShadow = `0 0 10px ${neon}55, 0 0 20px ${neon}22`}
+                    >
+                      {r.icon_url
+                        ? <img src={r.icon_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                        : r.emoji
+                      }
+                    </div>
+                    <span style={{ fontSize: '10px', color: 'var(--text2)', maxWidth: '66px', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
                   </div>
-                </div>
-                <span style={{ fontSize: '10px', color: 'var(--text2)', maxWidth: '58px', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+                )
+              })}
+              {/* Explore more */}
+              <div onClick={() => router.push('/explore')} style={{ flexShrink: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
+                <div style={{ width: '62px', height: '62px', borderRadius: '14px', border: '2px dashed var(--border2)', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', color: 'var(--text3)' }}>+</div>
+                <span style={{ fontSize: '10px', color: 'var(--text3)', whiteSpace: 'nowrap' }}>Explore</span>
               </div>
-            ))}
-            {/* Explore more */}
-            <div onClick={() => router.push('/explore')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer', flexShrink: 0 }}>
-              <div style={{ width: '57px', height: '57px', borderRadius: '50%', background: 'var(--bg3)', border: '1.5px dashed var(--border2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>+</div>
-              <span style={{ fontSize: '10px', color: 'var(--text3)', maxWidth: '58px', textAlign: 'center', whiteSpace: 'nowrap' }}>Explore</span>
             </div>
           </div>
         )}

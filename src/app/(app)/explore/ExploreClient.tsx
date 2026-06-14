@@ -72,6 +72,16 @@ export default function ExploreClient() {
     setLoading(false)
   }
 
+  // Refresh single room after navigation back (to pick up cover/icon changes)
+  async function refreshRoom(roomId: string) {
+    const { data } = await supabase.from('rooms').select('*, profiles(name, username)').eq('id', roomId).single()
+    if (data) {
+      const score = rooms.find(r => r.id === roomId)?.trending_score || 0
+      setRooms(prev => prev.map(r => r.id === roomId ? { ...data, trending_score: score } : r))
+      setTrendingRooms(prev => prev.map(r => r.id === roomId ? { ...data, trending_score: score } : r))
+    }
+  }
+
   async function toggleFollow(e: React.MouseEvent, roomId: string) {
     e.stopPropagation()
     if (!currentUserId) return
@@ -146,9 +156,12 @@ export default function ExploreClient() {
                     onMouseOver={e => (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'}
                     onMouseOut={e => (e.currentTarget as HTMLElement).style.transform = 'none'}
                   >
-                    <div style={{ height: '70px', background: ROOM_COLORS[r.category] || 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '30px', position: 'relative' }}>
-                      {r.emoji}
-                      {badge && <div style={{ position: 'absolute', bottom: '5px', left: '5px', fontSize: '9px', fontWeight: '700', color: '#fff', background: 'rgba(0,0,0,.55)', padding: '2px 5px', borderRadius: '4px' }}>{badge.label}</div>}
+                    <div style={{ height: '80px', background: r.cover_url ? 'none' : (ROOM_COLORS[r.category] || 'var(--bg3)'), position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>
+                      {r.cover_url
+                        ? <img src={r.cover_url} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
+                        : (r.icon_url ? <img src={r.icon_url} style={{ width: '44px', height: '44px', borderRadius: '10px' }} alt="" /> : r.emoji)
+                      }
+                      {badge && <div style={{ position: 'absolute', bottom: '5px', left: '5px', fontSize: '9px', fontWeight: '700', color: '#fff', background: 'rgba(0,0,0,.6)', padding: '2px 5px', borderRadius: '4px' }}>{badge.label}</div>}
                     </div>
                     <div style={{ padding: '8px' }}>
                       <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
@@ -192,19 +205,28 @@ export default function ExploreClient() {
               const badge = getActivityBadge(r.trending_score, r.member_count)
               const isFollowing = followedRooms.has(r.id)
               return (
-                <div key={r.id} onClick={() => router.push(`/rooms/${r.id}`)} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '13px', overflow: 'hidden', cursor: 'pointer', transition: 'all .2s' }}
+                <div key={r.id} onClick={() => { router.push(`/rooms/${r.id}`); setTimeout(() => refreshRoom(r.id), 2000) }} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '13px', overflow: 'hidden', cursor: 'pointer', transition: 'all .2s' }}
                   onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.15)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
                   onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.08)'; (e.currentTarget as HTMLElement).style.transform = 'none' }}
                 >
-                  {/* Room image */}
-                  <div style={{ height: '110px', background: ROOM_COLORS[r.category] || 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '46px', position: 'relative' }}>
-                    {r.emoji}
+                  {/* Room cover image — uses actual cover_url if set */}
+                  <div style={{ height: '110px', background: r.cover_url ? 'none' : (ROOM_COLORS[r.category] || 'var(--bg3)'), position: 'relative', overflow: 'hidden' }}>
+                    {r.cover_url
+                      ? <img src={r.cover_url} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
+                      : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '46px' }}>
+                          {r.icon_url ? <img src={r.icon_url} style={{ width: '52px', height: '52px', borderRadius: '12px' }} alt="" /> : r.emoji}
+                        </div>
+                    }
                     <div style={{ position: 'absolute', top: '8px', left: '8px', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 7px', background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(8px)', borderRadius: '20px', fontSize: '10px', color: '#fff' }}>
                       <span className="live-dot" style={{ width: '5px', height: '5px' }} />live
                     </div>
                     <div style={{ position: 'absolute', top: '8px', right: '8px', padding: '3px 7px', background: 'rgba(0,0,0,.5)', borderRadius: '20px', fontSize: '10px', color: 'rgba(255,255,255,.8)' }}>{r.type}</div>
-                    {badge && (
-                      <div style={{ position: 'absolute', bottom: '8px', left: '8px', fontSize: '10px', fontWeight: '700', color: '#fff', background: 'rgba(0,0,0,.6)', padding: '2px 6px', borderRadius: '4px' }}>{badge.label}</div>
+                    {badge && <div style={{ position: 'absolute', bottom: '8px', left: '8px', fontSize: '10px', fontWeight: '700', color: '#fff', background: 'rgba(0,0,0,.6)', padding: '2px 6px', borderRadius: '4px' }}>{badge.label}</div>}
+                    {/* Room icon overlay bottom-right */}
+                    {r.icon_url && r.cover_url && (
+                      <div style={{ position: 'absolute', bottom: '8px', right: '8px', width: '28px', height: '28px', borderRadius: '7px', overflow: 'hidden', border: '2px solid rgba(255,255,255,.3)' }}>
+                        <img src={r.icon_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                      </div>
                     )}
                   </div>
 
