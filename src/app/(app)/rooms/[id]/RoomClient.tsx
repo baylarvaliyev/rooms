@@ -133,8 +133,17 @@ export default function RoomClient({ room, initialMessages, members: initialMemb
   async function sendMessage() {
     if (!input.trim() || !joined || sending) return
     setSending(true)
-    await supabase.from('messages').insert({ room_id: room.id, user_id: currentUser.id, content: input.trim() })
-    setInput('')
+    const res = await fetch('/api/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room_id: room.id, content: input.trim() })
+    })
+    if (!res.ok) {
+      const { error } = await res.json()
+      if (error) alert(error)
+    } else {
+      setInput('')
+    }
     setSending(false)
   }
 
