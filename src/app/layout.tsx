@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import PWAProvider from '@/components/PWAProvider'
+import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -67,6 +69,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={inter.className} style={{ background: 'var(--bg0)' }}>
         {children}
         <PWAProvider />
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )
