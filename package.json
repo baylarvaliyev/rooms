@@ -6,10 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "android": "npx cap sync android && npx cap open android",
+    "android:build": "npx cap sync android",
+    "android:studio": "npx cap open android"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
     "@daily-co/daily-js": "^0.91.0",
     "@sentry/nextjs": "^10.57.0",
     "@supabase/ssr": "^0.12.0",
