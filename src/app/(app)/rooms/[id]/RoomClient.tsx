@@ -37,6 +37,174 @@ function formatEventDate(date: string) {
   return d.toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+function FounderDashboard({ room, members, onlineCount, schedules, supabase }: any) {
+  const [analytics, setAnalytics] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { loadAnalytics() }, [])
+
+  async function loadAnalytics() {
+    const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+    const [
+      { count: msgs7d },
+      { count: msgs30d },
+      { count: totalMsgs },
+      { data: recentMembers },
+      { data: topContributors },
+      { data: msgsByDay },
+    ] = await Promise.all([
+      supabase.from('messages').select('*', { count: 'exact', head: true }).eq('room_id', room.id).gte('created_at', since7d),
+      supabase.from('messages').select('*', { count: 'exact', head: true }).eq('room_id', room.id).gte('created_at', since30d),
+      supabase.from('messages').select('*', { count: 'exact', head: true }).eq('room_id', room.id),
+      supabase.from('room_members').select('created_at').eq('room_id', room.id).order('created_at', { ascending: false }).limit(30),
+      supabase.from('messages').select('user_id, profiles(name, avatar_url)').eq('room_id', room.id).gte('created_at', since30d),
+      supabase.from('messages').select('created_at').eq('room_id', room.id).gte('created_at', since7d),
+    ])
+
+    // Top contributors
+    const contrib: Record<string, any> = {}
+    ;(topContributors || []).forEach((m: any) => {
+      if (!m.user_id) return
+      if (!contrib[m.user_id]) contrib[m.user_id] = { count: 0, ...m.profiles }
+      contrib[m.user_id].count++
+    })
+    const topList = Object.values(contrib).sort((a: any, b: any) => b.count - a.count).slice(0, 5)
+
+    // Messages by day (last 7 days)
+    const dayMap: Record<string, number> = {}
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
+      dayMap[d.toLocaleDateString('en', { weekday: 'short' })] = 0
+    }
+    ;(msgsByDay || []).forEach((m: any) => {
+      const day = new Date(m.created_at).toLocaleDateString('en', { weekday: 'short' })
+      if (dayMap[day] !== undefined) dayMap[day]++
+    })
+
+    // Member growth (last 30 days by week)
+    const weekMap: Record<string, number> = { 'Week 1': 0, 'Week 2': 0, 'Week 3': 0, 'Week 4': 0 }
+    ;(recentMembers || []).forEach((m: any) => {
+      const daysAgo = Math.floor((Date.now() - new Date(m.created_at).getTime()) / (24 * 60 * 60 * 1000))
+      if (daysAgo <= 7) weekMap['Week 4']++
+      else if (daysAgo <= 14) weekMap['Week 3']++
+      else if (daysAgo <= 21) weekMap['Week 2']++
+      else if (daysAgo <= 30) weekMap['Week 1']++
+    })
+
+    setAnalytics({ msgs7d, msgs30d, totalMsgs, topList, dayMap, weekMap })
+    setLoading(false)
+  }
+
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}><div className="spinner" /></div>
+
+  const memberCount = members.length
+  const mods = members.filter((m: any) => m.is_moderator).length
+  const dayValues = Object.values(analytics.dayMap) as number[]
+  const maxDay = Math.max(...dayValues, 1)
+  const weekValues = Object.values(analytics.weekMap) as number[]
+  const maxWeek = Math.max(...weekValues, 1)
+
+  return (
+    <div>
+      {/* Key metrics */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '20px' }}>
+        {[
+          { label: 'Total Members', value: memberCount, icon: '👥', color: '#6366f1' },
+          { label: 'Online Now', value: onlineCount, icon: '🟢', color: '#22c55e' },
+          { label: 'Messages (7d)', value: analytics.msgs7d || 0, icon: '💬', color: '#0891b2' },
+          { label: 'Messages (30d)', value: analytics.msgs30d || 0, icon: '📊', color: '#f97316' },
+          { label: 'All Time Msgs', value: analytics.totalMsgs || 0, icon: '📨', color: '#a855f7' },
+          { label: 'Moderators', value: mods, icon: '🛡', color: '#ec4899' },
+        ].map(s => (
+          <div key={s.label} style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '12px', border: `1px solid ${s.color}22` }}>
+            <div style={{ fontSize: '18px', marginBottom: '4px' }}>{s.icon}</div>
+            <div style={{ fontWeight: '800', fontSize: '22px', color: s.color }}>{(s.value || 0).toLocaleString()}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '1px' }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Capacity bar */}
+      {room.max_members && (
+        <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text2)' }}>Room Capacity</span>
+            <span style={{ fontSize: '12px', color: 'var(--text1)', fontWeight: '700' }}>{memberCount} / {room.max_members}</span>
+          </div>
+          <div style={{ height: '8px', background: 'var(--bg4)', borderRadius: '4px', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${Math.min(100, (memberCount / room.max_members) * 100)}%`, background: memberCount / room.max_members > 0.8 ? 'var(--red)' : 'var(--ig-gradient)', borderRadius: '4px', transition: 'width .5s' }} />
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px' }}>{Math.round((memberCount / room.max_members) * 100)}% full</div>
+        </div>
+      )}
+
+      {/* Messages per day chart */}
+      <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
+        <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text2)', marginBottom: '14px' }}>💬 Messages — Last 7 Days</div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '80px' }}>
+          {Object.entries(analytics.dayMap).map(([day, count]: [string, any]) => (
+            <div key={day} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', height: '100%', justifyContent: 'flex-end' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text3)', fontWeight: '600' }}>{count > 0 ? count : ''}</div>
+              <div style={{ width: '100%', background: count > 0 ? 'var(--accent)' : 'var(--bg4)', borderRadius: '4px 4px 0 0', height: `${Math.max(4, (count / maxDay) * 60)}px`, transition: 'height .4s ease' }} />
+              <div style={{ fontSize: '9px', color: 'var(--text3)' }}>{day}</div>
+            </div>
+          ))}
+        </div>
+        {analytics.msgs7d === 0 && <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text3)', marginTop: '8px' }}>No messages yet this week</div>}
+      </div>
+
+      {/* Member growth chart */}
+      <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
+        <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text2)', marginBottom: '14px' }}>👥 New Members — Last 30 Days</div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '70px' }}>
+          {Object.entries(analytics.weekMap).map(([week, count]: [string, any]) => (
+            <div key={week} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', height: '100%', justifyContent: 'flex-end' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', fontWeight: '600' }}>{count > 0 ? `+${count}` : ''}</div>
+              <div style={{ width: '100%', background: count > 0 ? '#22c55e' : 'var(--bg4)', borderRadius: '4px 4px 0 0', height: `${Math.max(4, (count / maxWeek) * 50)}px`, transition: 'height .4s ease' }} />
+              <div style={{ fontSize: '9px', color: 'var(--text3)' }}>{week}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Top contributors */}
+      {analytics.topList.length > 0 && (
+        <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
+          <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text2)', marginBottom: '12px' }}>🏆 Top Contributors (30d)</div>
+          {analytics.topList.map((u: any, i: number) => (
+            <div key={u.id || i} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+              <div style={{ width: '20px', fontWeight: '700', fontSize: '12px', color: i < 3 ? 'var(--yellow)' : 'var(--text3)', textAlign: 'center' }}>{['🥇','🥈','🥉'][i] || i + 1}</div>
+              <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: '#6366f1', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: '#fff' }}>
+                {(u.name || 'U').charAt(0).toUpperCase()}
+              </div>
+              <div style={{ flex: 1, fontSize: '13px', fontWeight: '500' }}>{u.name || 'Unknown'}</div>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--accent2)' }}>{u.count} msgs</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Upcoming events */}
+      {schedules.length > 0 && (
+        <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px' }}>
+          <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text2)', marginBottom: '10px' }}>📅 Scheduled Events</div>
+          {schedules.slice(0, 3).map((s: any) => (
+            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', padding: '8px', background: 'var(--bg4)', borderRadius: '8px' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '12px', fontWeight: '600' }}>{s.title}</div>
+                <div style={{ fontSize: '10px', color: 'var(--accent)' }}>{new Date(s.starts_at).toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+              </div>
+              {s.is_recurring && <span style={{ fontSize: '9px', background: 'rgba(99,102,241,.2)', color: 'var(--accent2)', padding: '2px 6px', borderRadius: '4px' }}>🔄 {s.recurrence}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function RoomClient({ room: initialRoom, initialMessages, members: initialMembers, currentUser, isMember }: any) {
   const [room, setRoom] = useState(initialRoom)
   const [messages, setMessages] = useState(initialMessages)
@@ -697,37 +865,15 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
                 </div>
               )}
 
-              {/* Analytics tab — owner only */}
+              {/* Analytics tab — Founder Dashboard */}
               {settingsTab === 'analytics' && isOwner && (
-                <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
-                    {[
-                      { label: 'Total Members', value: memberCount, icon: '👥' },
-                      { label: 'Online Now', value: onlineCount, icon: '🟢' },
-                      { label: 'Moderators', value: members.filter((m: any) => m.is_moderator).length, icon: '🛡' },
-                      { label: 'Events', value: schedules.length, icon: '📅' },
-                      { label: 'RSVPs Total', value: schedules.reduce((a: number) => a, 0), icon: '✋' },
-                      { label: 'Join Mode', value: room.join_mode || 'open', icon: '🚪' },
-                    ].map(stat => (
-                      <div key={stat.label} style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px' }}>
-                        <div style={{ fontSize: '20px', marginBottom: '4px' }}>{stat.icon}</div>
-                        <div style={{ fontWeight: '700', fontSize: '20px', color: 'var(--text1)' }}>{stat.value}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>{stat.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {room.max_members && (
-                    <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '14px', marginBottom: '10px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '12px', color: 'var(--text3)' }}>Capacity</span>
-                        <span style={{ fontSize: '12px', color: 'var(--text1)', fontWeight: '600' }}>{memberCount} / {room.max_members}</span>
-                      </div>
-                      <div style={{ height: '6px', background: 'var(--bg4)', borderRadius: '3px', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${Math.min(100, (memberCount / room.max_members) * 100)}%`, background: 'var(--ig-gradient)', borderRadius: '3px', transition: 'width .3s' }} />
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <FounderDashboard
+                  room={room}
+                  members={members}
+                  onlineCount={onlineCount}
+                  schedules={schedules}
+                  supabase={supabase}
+                />
               )}
             </div>
           </div>
