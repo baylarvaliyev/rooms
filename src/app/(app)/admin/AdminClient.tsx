@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase'
 
 function timeAgo(date: string) {
   const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
@@ -10,6 +9,20 @@ function timeAgo(date: string) {
   if (s < 3600) return `${Math.floor(s/60)}m ago`
   if (s < 86400) return `${Math.floor(s/3600)}h ago`
   return `${Math.floor(s/86400)}d ago`
+}
+
+// All admin actions go through the server API — never direct Supabase
+async function adminAction(action: string, targetId?: string, reason?: string, data?: any) {
+  const res = await fetch('/api/admin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, targetId, reason, data }),
+  })
+  if (!res.ok) {
+    const err = await res.json()
+    throw new Error(err.error || 'Admin action failed')
+  }
+  return res.json()
 }
 
 export default function AdminClient({ stats, recentUsers, recentRooms, recentPosts, reports: initialReports, currentUserId }: any) {
@@ -24,109 +37,104 @@ export default function AdminClient({ stats, recentUsers, recentRooms, recentPos
   const [userSearch, setUserSearch] = useState('')
   const [searching, setSearching] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
-  // Search users
   async function searchUsers(q: string) {
     setUserSearch(q)
     if (q.length < 2) { setUsers(recentUsers); return }
     setSearching(true)
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, name, username, reputation, created_at, is_banned, is_shadowbanned, ban_reason, is_admin')
-      .or(`name.ilike.%${q}%,username.ilike.%${q}%`)
-      .limit(20)
-    setUsers(data || [])
+    try {
+      const { users: found } = await adminAction('search_users', undefined, undefined, { q })
+      setUsers(found)
+    } catch {}
     setSearching(false)
   }
 
-  // Open user edit modal
   function openEdit(u: any) {
     setEditUser(u)
     setEditForm({ name: u.name || '', username: u.username || '', ban_reason: u.ban_reason || '' })
   }
 
-  // Save user edits (name + username)
   async function saveUserEdit() {
     if (!editUser) return
-    await supabase.from('profiles').update({
-      name: editForm.name,
-      username: editForm.username.toLowerCase().replace(/[^a-z0-9_]/g, ''),
-    }).eq('id', editUser.id)
-    setUsers((prev: any[]) => prev.map(u => u.id === editUser.id ? { ...u, name: editForm.name, username: editForm.username } : u))
-    setEditUser(null)
+    try {
+      await adminAction('edit_user', editUser.id, undefined, { name: editForm.name, username: editForm.username })
+      setUsers((prev: any[]) => prev.map(u => u.id === editUser.id ? { ...u, name: editForm.name, username: editForm.username } : u))
+      setEditUser(null)
+    } catch (e: any) { alert(e.message) }
   }
 
-  // Ban user
   async function banUser(userId: string, reason: string) {
-    await supabase.from('profiles').update({
-      is_banned: true,
-      banned_at: new Date().toISOString(),
-      ban_reason: reason || 'Violation of Terms of Service',
-    }).eq('id', userId)
-    setUsers((prev: any[]) => prev.map(u => u.id === userId ? { ...u, is_banned: true, ban_reason: reason } : u))
-    setEditUser(null)
-    alert('User banned.')
+    try {
+      await adminAction('ban_user', userId, reason)
+      setUsers((prev: any[]) => prev.map(u => u.id === userId ? { ...u, is_banned: true, ban_reason: reason } : u))
+      setEditUser(null)
+      alert('User banned.')
+    } catch (e: any) { alert(e.message) }
   }
 
-  // Unban user
   async function unbanUser(userId: string) {
-    await supabase.from('profiles').update({ is_banned: false, banned_at: null, ban_reason: null }).eq('id', userId)
-    setUsers((prev: any[]) => prev.map(u => u.id === userId ? { ...u, is_banned: false } : u))
-    alert('User unbanned.')
+    try {
+      await adminAction('unban_user', userId)
+      setUsers((prev: any[]) => prev.map(u => u.id === userId ? { ...u, is_banned: false } : u))
+      alert('User unbanned.')
+    } catch (e: any) { alert(e.message) }
   }
 
-  // Shadowban user (their posts are hidden from others but they don't know)
   async function shadowbanUser(userId: string) {
-    await supabase.from('profiles').update({ is_shadowbanned: true }).eq('id', userId)
-    setUsers((prev: any[]) => prev.map(u => u.id === userId ? { ...u, is_shadowbanned: true } : u))
-    setEditUser(null)
-    alert('User shadowbanned.')
+    try {
+      await adminAction('shadowban_user', userId)
+      setUsers((prev: any[]) => prev.map(u => u.id === userId ? { ...u, is_shadowbanned: true } : u))
+      setEditUser(null)
+      alert('User shadowbanned.')
+    } catch (e: any) { alert(e.message) }
   }
 
-  // Remove shadowban
   async function unshadowbanUser(userId: string) {
-    await supabase.from('profiles').update({ is_shadowbanned: false }).eq('id', userId)
-    setUsers((prev: any[]) => prev.map(u => u.id === userId ? { ...u, is_shadowbanned: false } : u))
-    alert('Shadowban removed.')
+    try {
+      await adminAction('unshadowban_user', userId)
+      setUsers((prev: any[]) => prev.map(u => u.id === userId ? { ...u, is_shadowbanned: false } : u))
+      alert('Shadowban removed.')
+    } catch (e: any) { alert(e.message) }
   }
 
-  // Delete all user content
   async function nukeUser(userId: string, username: string) {
-    if (!confirm(`DELETE ALL content from @${username}? Posts, messages, comments — everything. Cannot be undone.`)) return
-    await Promise.all([
-      supabase.from('posts').delete().eq('user_id', userId),
-      supabase.from('messages').delete().eq('user_id', userId),
-      supabase.from('comments').delete().eq('user_id', userId),
-    ])
-    setEditUser(null)
-    alert('All content deleted.')
+    if (!confirm(`DELETE ALL content from @${username}? Cannot be undone.`)) return
+    try {
+      await adminAction('delete_user_content', userId)
+      setEditUser(null)
+      alert('All content deleted.')
+    } catch (e: any) { alert(e.message) }
   }
 
-  // Delete room
   async function deleteRoom(id: string) {
     if (!confirm('Delete this room? Cannot be undone.')) return
-    await supabase.from('rooms').delete().eq('id', id)
-    setRooms((prev: any[]) => prev.filter(r => r.id !== id))
+    try {
+      await adminAction('delete_room', id)
+      setRooms((prev: any[]) => prev.filter(r => r.id !== id))
+    } catch (e: any) { alert(e.message) }
   }
 
-  // Delete post
   async function deletePost(id: string) {
     if (!confirm('Delete this post?')) return
-    await supabase.from('posts').delete().eq('id', id)
-    setPosts((prev: any[]) => prev.filter(p => p.id !== id))
+    try {
+      await adminAction('delete_post', id)
+      setPosts((prev: any[]) => prev.filter(p => p.id !== id))
+    } catch (e: any) { alert(e.message) }
   }
 
   async function dismissReport(id: string) {
-    await supabase.from('reports').update({ status: 'dismissed' }).eq('id', id)
-    setReports((prev: any[]) => prev.map(r => r.id === id ? { ...r, status: 'dismissed' } : r))
+    try {
+      await adminAction('dismiss_report', id)
+      setReports((prev: any[]) => prev.map(r => r.id === id ? { ...r, status: 'dismissed' } : r))
+    } catch (e: any) { alert(e.message) }
   }
 
-  async function resolveReport(id: string, postId: string) {
-    if (!confirm('Delete the reported post?')) return
-    await supabase.from('posts').delete().eq('id', postId)
-    await supabase.from('reports').update({ status: 'resolved' }).eq('id', id)
-    setReports((prev: any[]) => prev.map(r => r.id === id ? { ...r, status: 'resolved' } : r))
+  async function resolveReport(id: string) {
+    if (!confirm('Delete the reported post and resolve?')) return
+    try {
+      await adminAction('resolve_report', id)
+      setReports((prev: any[]) => prev.map(r => r.id === id ? { ...r, status: 'resolved' } : r))
+    } catch (e: any) { alert(e.message) }
   }
 
   const pendingReports = reports.filter((r: any) => r.status === 'pending').length
@@ -305,7 +313,7 @@ export default function AdminClient({ stats, recentUsers, recentRooms, recentPos
                     {r.status === 'pending' && (
                       <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                         <button onClick={() => dismissReport(r.id)} style={{ padding: '5px 11px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '7px', color: 'var(--text2)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>Dismiss</button>
-                        {r.post_id && <button onClick={() => resolveReport(r.id, r.post_id)} style={{ padding: '5px 11px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '7px', color: 'var(--red)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>Delete Post</button>}
+                        {r.post_id && <button onClick={() => resolveReport(r.id)} style={{ padding: '5px 11px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '7px', color: 'var(--red)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>Delete Post</button>}
                       </div>
                     )}
                   </div>
