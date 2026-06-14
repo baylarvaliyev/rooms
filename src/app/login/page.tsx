@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [emailSent, setEmailSent] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -19,12 +20,21 @@ export default function LoginPage() {
     setError('')
 
     if (mode === 'signup') {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { name } }
+        options: {
+          data: { name },
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`
+        }
       })
       if (error) { setError(error.message); setLoading(false); return }
+      // If email confirmation is ON, identities will be empty or session null
+      if (!data.session) {
+        setEmailSent(true)
+        setLoading(false)
+        return
+      }
       router.push('/onboarding')
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -39,6 +49,26 @@ export default function LoginPage() {
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth/callback` }
     })
+  }
+
+  // Email confirmation screen
+  if (emailSent) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', background: 'var(--bg0)' }}>
+        <div className="fade-up" style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '24px', padding: '40px', width: '100%', maxWidth: '400px', textAlign: 'center' }}>
+          <div style={{ fontSize: '56px', marginBottom: '16px' }}>📧</div>
+          <div style={{ fontWeight: '800', fontSize: '22px', marginBottom: '8px' }}>Check your email</div>
+          <div style={{ fontSize: '14px', color: 'var(--text3)', marginBottom: '6px' }}>We sent a confirmation link to:</div>
+          <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text1)', marginBottom: '24px' }}>{email}</div>
+          <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '24px', lineHeight: '1.6' }}>
+            Click the link in your email to confirm your account and start using Rooms.
+          </div>
+          <button onClick={() => setEmailSent(false)} style={{ width: '100%', padding: '11px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text2)', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>
+            Back to sign in
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
