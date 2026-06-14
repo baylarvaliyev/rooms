@@ -18,6 +18,14 @@ const Icons = {
       <line x1="21" y1="21" x2="16.65" y2="16.65"/>
     </svg>
   ),
+  search: (active: boolean) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8"/>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      <line x1="11" y1="8" x2="11" y2="14"/>
+      <line x1="8" y1="11" x2="14" y2="11"/>
+    </svg>
+  ),
   messages: (active: boolean) => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
@@ -26,13 +34,6 @@ const Icons = {
   notifications: (active: boolean) => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
-    </svg>
-  ),
-  create: () => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="3"/>
-      <line x1="12" y1="8" x2="12" y2="16"/>
-      <line x1="8" y1="12" x2="16" y2="12"/>
     </svg>
   ),
   leaderboard: (active: boolean) => (
@@ -51,6 +52,7 @@ const Icons = {
 const NAV = [
   { id: 'feed',          icon: Icons.home,         path: '/feed',          label: 'Home' },
   { id: 'explore',       icon: Icons.explore,      path: '/explore',       label: 'Explore' },
+  { id: 'search',        icon: Icons.search,       path: '/search',        label: 'Search' },
   { id: 'messages',      icon: Icons.messages,     path: '/messages',      label: 'Messages' },
   { id: 'notifications', icon: Icons.notifications,path: '/notifications', label: 'Notifications' },
   { id: 'leaderboard',   icon: Icons.leaderboard,  path: '/leaderboard',   label: 'Leaderboard' },
@@ -58,11 +60,11 @@ const NAV = [
 ]
 
 const MOBILE_NAV = [
-  { id: 'feed',        icon: Icons.home,         path: '/feed' },
-  { id: 'explore',     icon: Icons.explore,      path: '/explore' },
-  { id: 'leaderboard', icon: Icons.leaderboard,  path: '/leaderboard' },
-  { id: 'messages',    icon: Icons.messages,     path: '/messages' },
-  { id: 'profile',     icon: null,               path: '/profile' },
+  { id: 'feed',     icon: Icons.home,     path: '/feed' },
+  { id: 'explore',  icon: Icons.explore,  path: '/explore' },
+  { id: 'search',   icon: Icons.search,   path: '/search' },
+  { id: 'messages', icon: Icons.messages, path: '/messages' },
+  { id: 'profile',  icon: null,           path: '/profile' },
 ]
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
