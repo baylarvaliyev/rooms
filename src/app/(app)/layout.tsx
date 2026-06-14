@@ -71,6 +71,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
   const [profile, setProfile] = useState<any>(null)
   const [notifCount, setNotifCount] = useState(0)
+  const [dmCount, setDmCount] = useState(0)
 
   useEffect(() => {
     let channel: any = null
@@ -84,8 +85,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       const { count: nc } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('read', false)
       setNotifCount(nc || 0)
       if (channel) return
-      channel = supabase.channel(`notifs:${user.id}`)
+      channel = supabase.channel(`layout:${user.id}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => setNotifCount(p => p + 1))
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `to_user=eq.${user.id}` }, () => {
+          // Only show badge if not on messages page
+          if (!window.location.pathname.startsWith('/messages')) setDmCount(p => p + 1)
+        })
         .subscribe()
     }
     load()
@@ -93,6 +98,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [pathname])
 
   useEffect(() => { if (pathname === '/notifications') setNotifCount(0) }, [pathname])
+  useEffect(() => { if (pathname.startsWith('/messages')) setDmCount(0) }, [pathname])
 
   async function signOut() { await supabase.auth.signOut(); router.push('/login') }
 
@@ -119,6 +125,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {n.icon(isActive)}
               {n.id === 'notifications' && notifCount > 0 && (
                 <div style={{ position: 'absolute', top: '6px', right: '6px', width: '8px', height: '8px', background: 'var(--red)', borderRadius: '50%', border: '1.5px solid var(--bg0)' }} />
+              )}
+              {n.id === 'messages' && dmCount > 0 && (
+                <div style={{ position: 'absolute', top: '6px', right: '6px', width: '8px', height: '8px', background: 'var(--accent)', borderRadius: '50%', border: '1.5px solid var(--bg0)' }} />
               )}
             </div>
           )
@@ -186,6 +195,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   {n.icon!(isActive)}
                   {n.id === 'notifications' && notifCount > 0 && (
                     <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '8px', height: '8px', background: 'var(--red)', borderRadius: '50%', border: '1.5px solid var(--bg0)' }} />
+                  )}
+                  {n.id === 'messages' && dmCount > 0 && (
+                    <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '8px', height: '8px', background: 'var(--accent)', borderRadius: '50%', border: '1.5px solid var(--bg0)' }} />
                   )}
                 </div>
               )}
