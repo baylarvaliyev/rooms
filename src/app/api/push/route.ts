@@ -2,14 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import webpush from 'web-push'
 
-webpush.setVapidDetails(
-  process.env.VAPID_EMAIL!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
+// Do NOT call setVapidDetails at module level — env vars aren't available at build time
+// Call it lazily inside the request handler instead
 
 export async function POST(req: NextRequest) {
   try {
+    // Set VAPID details lazily inside the handler
+    webpush.setVapidDetails(
+      process.env.VAPID_EMAIL || 'mailto:admin@rooms.app',
+      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+      process.env.VAPID_PRIVATE_KEY!
+    )
+
     const supabase = await createServerSupabaseClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -25,7 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // Send notification to a specific user (called server-side)
+    // Send notification to a specific user
     if (action === 'send') {
       const { to_user_id, title, body, url } = notification
       const { data: sub } = await supabase
@@ -37,8 +41,7 @@ export async function POST(req: NextRequest) {
       if (!sub) return NextResponse.json({ error: 'No subscription' }, { status: 404 })
 
       await webpush.sendNotification(sub.subscription, JSON.stringify({
-        title,
-        body,
+        title, body,
         url: url || '/notifications',
         icon: '/icon.svg',
       }))
