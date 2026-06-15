@@ -235,7 +235,7 @@ export default function PinterestRoom({ room, currentUser, isMember }: any) {
 
               {/* Image — full width */}
               <div style={{ background: '#000', width: '100%' }}>
-                <img src={openPin.image_url} alt={openPin.caption || 'Pin'} style={{ width: '100%', maxHeight: '55vw', objectFit: 'contain', display: 'block' }} />
+                <img src={openPin.image_url} alt={openPin.caption || 'Pin'} style={{ width: '100%', maxHeight: '70vw', objectFit: 'contain', display: 'block' }} />
               </div>
 
               {/* Caption */}
@@ -296,7 +296,7 @@ export default function PinterestRoom({ room, currentUser, isMember }: any) {
         )}
 
         {!loading && pins.length > 0 && (
-          <div style={{ columns: '3', columnGap: '10px' }}>
+          <div style={{ columns: 'auto', columnWidth: '140px', columnGap: '8px' }}>
             {pins.map(pin => (
               <div key={pin.id} onClick={() => openPinModal(pin)} style={{ breakInside: 'avoid', marginBottom: '10px', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border)', position: 'relative', cursor: 'pointer', display: 'block', background: 'var(--bg2)', transition: 'transform .2s' }}
                 onMouseOver={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.01)'; const o = e.currentTarget.querySelector('.pin-overlay') as HTMLElement; if (o) o.style.opacity = '1' }}

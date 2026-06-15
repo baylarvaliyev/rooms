@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
 const COLORS = ['#6366f1','#0891b2','#ec4899','#16a34a','#0f766e','#7c3aed','#d97706','#f97316']
@@ -53,6 +54,7 @@ export default function MessagesClient() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set())
   const typingTimeoutRef = useRef<any>(null)
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   useEffect(() => {
@@ -62,6 +64,18 @@ export default function MessagesClient() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Auto-open conversation from URL params (e.g. from user profile Message button)
+  useEffect(() => {
+    if (!searchParams || loading) return
+    const userId = searchParams.get('user')
+    const name = searchParams.get('name')
+    const username = searchParams.get('username')
+    if (userId && name && !activeUser) {
+      const user = { id: userId, name: decodeURIComponent(name), username: username ? decodeURIComponent(username) : '' }
+      openConversation(user)
+    }
+  }, [loading, searchParams])
 
   // Real-time DM listener — global for this user
   useEffect(() => {

@@ -47,9 +47,13 @@ export default function LoginPage() {
   }
 
   async function handleGoogle() {
+    // Use the current origin — works on both localhost and Vercel
+    const redirectTo = typeof window !== 'undefined'
+      ? `${window.location.origin}/auth/callback`
+      : 'https://rooms-rbp4.vercel.app/auth/callback'
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` }
+      options: { redirectTo }
     })
   }
 
