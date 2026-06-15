@@ -18,17 +18,6 @@ function timeAgo(date: string) {
   return `${Math.floor(s/86400)}d ago`
 }
 
-const ACHIEVEMENT_META: Record<string, { icon: string, label: string, desc: string, color: string }> = {
-  first_post:     { icon: '✍️', label: 'First Post',      desc: 'Published your first post',   color: '#6366f1' },
-  prolific_poster:{ icon: '📝', label: 'Prolific Poster', desc: 'Published 10 posts',           color: '#0891b2' },
-  viral:          { icon: '🔥', label: 'Viral',           desc: 'Received 50 likes',            color: '#ef4444' },
-  influencer:     { icon: '⭐', label: 'Influencer',      desc: 'Gained 10 followers',          color: '#eab308' },
-  room_explorer:  { icon: '🧭', label: 'Room Explorer',   desc: 'Joined 5 rooms',               color: '#0f766e' },
-  rising_star:    { icon: '🌟', label: 'Rising Star',     desc: 'Reached 100 reputation',       color: '#f97316' },
-  elite:          { icon: '👑', label: 'Elite',           desc: 'Reached 1000 reputation',      color: '#a855f7' },
-}
-const ALL_ACHIEVEMENTS = Object.keys(ACHIEVEMENT_META)
-
 const ROOM_COLORS: Record<string, string> = {
   Business: 'linear-gradient(135deg,#0a1e3a,#1a3a6e)',
   Technology: 'linear-gradient(135deg,#1e0a3a,#3d1a5e)',
@@ -58,16 +47,9 @@ const MEDALS = ['🥇', '🥈', '🥉']
 
 function LeaderboardTab({ profile, leaderboard, myRank, loading, onLoad, router, getColor }: any) {
   useEffect(() => { onLoad() }, [])
-
-  if (loading) return (
-    <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
-      <div className="spinner" />
-    </div>
-  )
-
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}><div className="spinner" /></div>
   return (
     <div>
-      {/* My rank banner */}
       {myRank && (
         <div style={{ background: 'linear-gradient(135deg, rgba(225,48,108,.08), rgba(131,58,180,.06))', border: '1px solid rgba(225,48,108,.2)', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
@@ -80,19 +62,15 @@ function LeaderboardTab({ profile, leaderboard, myRank, loading, onLoad, router,
           </div>
         </div>
       )}
-
-      {/* Top 10 list */}
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '13px', overflow: 'hidden', marginBottom: '14px' }}>
         {leaderboard.map((u: any, i: number) => {
           const isMe = u.id === profile?.id
           return (
-            <div key={u.id} onClick={() => router.push(`/users/${u.username}`)} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 14px', borderBottom: i < leaderboard.length - 1 ? '1px solid var(--border)' : 'none', background: isMe ? 'rgba(225,48,108,.06)' : 'none', cursor: 'pointer', transition: 'background .15s' }}
+            <div key={u.id} onClick={() => router.push(`/users/${u.username}`)} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 14px', borderBottom: i < leaderboard.length - 1 ? '1px solid var(--border)' : 'none', background: isMe ? 'rgba(225,48,108,.06)' : 'none', cursor: 'pointer' }}
               onMouseOver={e => (e.currentTarget as HTMLElement).style.background = isMe ? 'rgba(225,48,108,.1)' : 'var(--bg3)'}
               onMouseOut={e => (e.currentTarget as HTMLElement).style.background = isMe ? 'rgba(225,48,108,.06)' : 'none'}
             >
-              <div style={{ width: '26px', textAlign: 'center', fontWeight: '700', fontSize: i < 3 ? '16px' : '13px', color: i < 3 ? 'var(--yellow)' : 'var(--text3)', flexShrink: 0 }}>
-                {i < 3 ? MEDALS[i] : i + 1}
-              </div>
+              <div style={{ width: '26px', textAlign: 'center', fontWeight: '700', fontSize: i < 3 ? '16px' : '13px', color: i < 3 ? 'var(--yellow)' : 'var(--text3)' }}>{i < 3 ? MEDALS[i] : i + 1}</div>
               <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: u.avatar_url ? 'none' : getColor(u.name || 'U'), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: '#fff', overflow: 'hidden' }}>
                 {u.avatar_url ? <img src={u.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : (u.name || 'U').charAt(0).toUpperCase()}
               </div>
@@ -103,39 +81,34 @@ function LeaderboardTab({ profile, leaderboard, myRank, loading, onLoad, router,
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text3)' }}>@{u.username}</div>
               </div>
-              <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text1)', flexShrink: 0 }}>
-                {(u.reputation || 0).toLocaleString()} <span style={{ fontSize: '10px', color: 'var(--text3)', fontWeight: '400' }}>pts</span>
-              </div>
+              <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text1)' }}>{(u.reputation || 0).toLocaleString()} <span style={{ fontSize: '10px', color: 'var(--text3)', fontWeight: '400' }}>pts</span></div>
             </div>
           )
         })}
       </div>
-
-      {/* View full leaderboard button */}
-      <button onClick={() => router.push('/leaderboard')} style={{ width: '100%', padding: '12px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text2)', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all .2s' }}
+      <button onClick={() => router.push('/leaderboard')} style={{ width: '100%', padding: '12px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text2)', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
         onMouseOver={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'}
         onMouseOut={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
-      >
-        🏆 View Full Leaderboard →
-      </button>
+      >🏆 View Full Leaderboard →</button>
     </div>
   )
 }
 
-export default function ProfileClient({ profile: initialProfile, posts: initialPosts, rooms: initialRooms, followersCount: initialFollowers, followingCount: initialFollowing, achievements: initialAchievements }: any) {
+export default function ProfileClient({ profile: initialProfile, posts: initialPosts, rooms: initialRooms, followersCount: initialFollowers, followingCount: initialFollowing }: any) {
   const [profile, setProfile] = useState(initialProfile || null)
   const [posts, setPosts] = useState(initialPosts || [])
   const [rooms, setRooms] = useState(initialRooms || [])
   const [followersCount, setFollowersCount] = useState(initialFollowers || 0)
   const [followingCount, setFollowingCount] = useState(initialFollowing || 0)
-  const [achievements, setAchievements] = useState(initialAchievements || [])
   const [dataLoading, setDataLoading] = useState(!initialProfile)
-  const [tab, setTab] = useState<'posts' | 'rooms' | 'achievements' | 'leaderboard'>('posts')
-
-  function switchTab(t: 'posts' | 'rooms' | 'achievements' | 'leaderboard') {
-    setTab(t)
-    if (t === 'leaderboard') loadLeaderboard()
-  }
+  const [tab, setTab] = useState<'posts' | 'rooms' | 'likes' | 'saved' | 'leaderboard'>('posts')
+  const [likedPosts, setLikedPosts] = useState<any[]>([])
+  const [savedPosts, setSavedPosts] = useState<any[]>([])
+  const [likesLoading, setLikesLoading] = useState(false)
+  const [savedLoading, setSavedLoading] = useState(false)
+  const [leaderboard, setLeaderboard] = useState<any[]>([])
+  const [myRank, setMyRank] = useState<number | null>(null)
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false)
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(profile?.name || '')
   const [username, setUsername] = useState(profile?.username || '')
@@ -149,9 +122,6 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
   const [coverUrl, setCoverUrl] = useState(profile?.cover_url || '')
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
-  const [leaderboard, setLeaderboard] = useState<any[]>([])
-  const [myRank, setMyRank] = useState<number | null>(null)
-  const [leaderboardLoading, setLeaderboardLoading] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const avatarRef = useRef<HTMLInputElement>(null)
   const coverRef = useRef<HTMLInputElement>(null)
@@ -164,31 +134,22 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
     router.push('/login')
   }
 
-  useEffect(() => {
-    if (!initialProfile) loadProfile()
-  }, [])
+  useEffect(() => { if (!initialProfile) loadProfile() }, [])
 
   async function loadProfile() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const [
-      { data: profileData },
-      { data: postsData },
-      { data: roomsData },
-      { count: followers },
-      { count: following },
-      { data: achievementsData },
-    ] = await Promise.all([
+    const [{ data: profileData }, { data: postsData }, { data: roomsData }, { count: followers }, { count: following }] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).single(),
       supabase.from('posts').select('*, rooms(name, emoji)').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('room_members').select('*, rooms(id, name, emoji, category, member_count)').eq('user_id', user.id),
       supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id),
       supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id),
-      supabase.from('achievements').select('*').eq('user_id', user.id),
     ])
     if (profileData) {
       setProfile(profileData)
       setName(profileData.name || '')
+      setUsername(profileData.username || '')
       setBio(profileData.bio || '')
       setTwitter(profileData.social_links?.twitter || '')
       setLinkedin(profileData.social_links?.linkedin || '')
@@ -200,56 +161,76 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
     setRooms(roomsData || [])
     setFollowersCount(followers || 0)
     setFollowingCount(following || 0)
-    setAchievements(achievementsData || [])
     setDataLoading(false)
   }
 
+  async function loadLikes() {
+    if (likesLoading || likedPosts.length > 0) return
+    setLikesLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: likeRows } = await supabase.from('likes').select('post_id').eq('user_id', user.id)
+    if (!likeRows || likeRows.length === 0) { setLikesLoading(false); return }
+    const ids = likeRows.map((l: any) => l.post_id)
+    const { data } = await supabase.from('posts').select('*, profiles(name, username, avatar_url), rooms(name, emoji)').in('id', ids).order('created_at', { ascending: false })
+    setLikedPosts(data || [])
+    setLikesLoading(false)
+  }
+
+  async function loadSaved() {
+    if (savedLoading || savedPosts.length > 0) return
+    setSavedLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: savedRows } = await supabase.from('saved_posts').select('post_id').eq('user_id', user.id)
+    if (!savedRows || savedRows.length === 0) { setSavedLoading(false); return }
+    const ids = savedRows.map((s: any) => s.post_id)
+    const { data } = await supabase.from('posts').select('*, profiles(name, username, avatar_url), rooms(name, emoji)').in('id', ids).order('created_at', { ascending: false })
+    setSavedPosts(data || [])
+    setSavedLoading(false)
+  }
+
   async function loadLeaderboard() {
-    if (leaderboard.length > 0) return // already loaded
+    if (leaderboard.length > 0) return
     setLeaderboardLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    const { data: topUsers } = await supabase
-      .from('profiles')
-      .select('id, name, username, avatar_url, reputation')
-      .order('reputation', { ascending: false })
-      .limit(10)
+    const { data: topUsers } = await supabase.from('profiles').select('id, name, username, avatar_url, reputation').order('reputation', { ascending: false }).limit(10)
     setLeaderboard(topUsers || [])
-    // Find my rank
     if (user && profile) {
-      const { count } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .gt('reputation', profile.reputation || 0)
+      const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).gt('reputation', profile.reputation || 0)
       setMyRank((count || 0) + 1)
     }
     setLeaderboardLoading(false)
+  }
+
+  function switchTab(t: typeof tab) {
+    setTab(t)
+    if (t === 'leaderboard') loadLeaderboard()
+    if (t === 'likes') loadLikes()
+    if (t === 'saved') loadSaved()
   }
 
   const color = getColor(profile?.name || 'U')
   const rep = profile?.reputation || 0
   const { level, title, next } = getLevel(rep)
   const progress = next ? Math.min(100, (rep / next) * 100) : 100
-  const earnedTypes = new Set((achievements || []).map((a: any) => a.type))
 
-  if (dataLoading) {
-    return (
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-        <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden', marginBottom: '16px', animation: 'pulse 1.5s infinite' }}>
-            <div style={{ height: '160px', background: 'var(--bg4)' }} />
-            <div style={{ padding: '50px 20px 20px' }}>
-              <div style={{ height: '18px', background: 'var(--bg4)', borderRadius: '6px', width: '30%', marginBottom: '8px' }} />
-              <div style={{ height: '12px', background: 'var(--bg4)', borderRadius: '6px', width: '20%' }} />
-            </div>
+  if (dataLoading) return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+      <div style={{ maxWidth: '700px', margin: '0 auto' }}>
+        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden', marginBottom: '16px', animation: 'pulse 1.5s infinite' }}>
+          <div style={{ height: '160px', background: 'var(--bg4)' }} />
+          <div style={{ padding: '50px 20px 20px' }}>
+            <div style={{ height: '18px', background: 'var(--bg4)', borderRadius: '6px', width: '30%', marginBottom: '8px' }} />
+            <div style={{ height: '12px', background: 'var(--bg4)', borderRadius: '6px', width: '20%' }} />
           </div>
         </div>
       </div>
-    )
-  }
+    </div>
+  )
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0]; if (!file) return
     if (file.size > 5 * 1024 * 1024) { alert('Image must be under 5MB'); return }
     setUploadingAvatar(true)
     const ext = file.name.split('.').pop()
@@ -265,8 +246,7 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
   }
 
   async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0]; if (!file) return
     if (file.size > 10 * 1024 * 1024) { alert('Image must be under 10MB'); return }
     setUploadingCover(true)
     const ext = file.name.split('.').pop()
@@ -282,31 +262,38 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
   }
 
   async function saveProfile() {
-    setSaving(true)
-    setUsernameError('')
+    setSaving(true); setUsernameError('')
     const cleanUsername = username.toLowerCase().replace(/[^a-z0-9_]/g, '')
-
-    // Check username availability if changed
     if (cleanUsername !== profile.username) {
       const { data: existing } = await supabase.from('profiles').select('id').eq('username', cleanUsername).neq('id', profile.id).single()
-      if (existing) {
-        setUsernameError('Username already taken — choose another')
-        setSaving(false)
-        return
-      }
+      if (existing) { setUsernameError('Username already taken'); setSaving(false); return }
     }
-
-    await supabase.from('profiles').update({
-      name,
-      username: cleanUsername,
-      bio,
-      social_links: { twitter, linkedin, website }
-    }).eq('id', profile.id)
-
+    await supabase.from('profiles').update({ name, username: cleanUsername, bio, social_links: { twitter, linkedin, website } }).eq('id', profile.id)
     setProfile((p: any) => ({ ...p, name, username: cleanUsername, bio }))
-    setSaving(false)
-    setEditing(false)
-    router.refresh()
+    setSaving(false); setEditing(false); router.refresh()
+  }
+
+  // Reusable post card for likes/saved tabs
+  function PostCard({ post }: { post: any }) {
+    const posterName = post.profiles?.name || 'Unknown'
+    return (
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px', marginBottom: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: getColor(posterName), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: '#fff', overflow: 'hidden' }}>
+            {post.profiles?.avatar_url ? <img src={post.profiles.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : posterName.charAt(0).toUpperCase()}
+          </div>
+          <span style={{ fontSize: '13px', fontWeight: '600' }}>{posterName}</span>
+          {post.rooms && <><span style={{ color: 'var(--text3)', fontSize: '12px' }}>·</span><span style={{ fontSize: '11px', color: 'var(--text3)' }}>{post.rooms.emoji} {post.rooms.name}</span></>}
+          <span style={{ fontSize: '11px', color: 'var(--text3)', marginLeft: 'auto' }}>{timeAgo(post.created_at)}</span>
+        </div>
+        <div style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: '1.6', whiteSpace: 'pre-wrap', marginBottom: post.media_url ? '8px' : '0' }}>{post.content}</div>
+        {post.media_url && <img src={post.media_url} alt="" style={{ width: '100%', maxHeight: '240px', objectFit: 'cover', borderRadius: '8px' }} />}
+        <div style={{ display: 'flex', gap: '14px', marginTop: '8px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text3)' }}>❤️ {post.like_count}</span>
+          <span style={{ fontSize: '12px', color: 'var(--text3)' }}>💬 {post.comment_count}</span>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -317,13 +304,8 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden', marginBottom: '16px' }}>
 
           {/* Cover photo */}
-          <div style={{ height: '160px', position: 'relative', overflow: 'hidden', cursor: 'pointer' }}
-            onClick={() => coverRef.current?.click()}>
-            {coverUrl
-              ? <img src={coverUrl} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${color}55, ${color}22)` }} />
-            }
-            {/* Cover overlay */}
+          <div style={{ height: '160px', position: 'relative', overflow: 'hidden', cursor: 'pointer' }} onClick={() => coverRef.current?.click()}>
+            {coverUrl ? <img src={coverUrl} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${color}55, ${color}22)` }} />}
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity .2s' }}
               onMouseOver={e => (e.currentTarget as HTMLElement).style.opacity = '1'}
               onMouseOut={e => (e.currentTarget as HTMLElement).style.opacity = '0'}
@@ -334,10 +316,15 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
             </div>
             <input ref={coverRef} type="file" accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} />
 
-            {/* Edit button */}
-            <button onClick={e => { e.stopPropagation(); setEditing(!editing) }} style={{ position: 'absolute', top: '12px', right: '12px', padding: '6px 14px', background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,.2)', borderRadius: '8px', color: '#fff', fontSize: '12px', cursor: 'pointer', fontWeight: '500' }}>
-              {editing ? 'Cancel' : '✏️ Edit profile'}
-            </button>
+            {/* Edit + Settings icons top right */}
+            <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '6px' }}>
+              <button onClick={e => { e.stopPropagation(); setEditing(!editing) }} style={{ padding: '6px 12px', background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,.2)', borderRadius: '8px', color: '#fff', fontSize: '12px', cursor: 'pointer', fontWeight: '500' }}>
+                {editing ? 'Cancel' : '✏️ Edit'}
+              </button>
+              <button onClick={e => { e.stopPropagation(); router.push('/settings') }} style={{ width: '32px', height: '32px', background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,.2)', borderRadius: '8px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+              </button>
+            </div>
           </div>
 
           <div style={{ padding: '0 20px 20px', position: 'relative' }}>
@@ -361,7 +348,7 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
                   </div>
                   <div>
                     <label style={{ fontSize: '12px', color: 'var(--text3)', display: 'block', marginBottom: '4px' }}>Username</label>
-                    <input value={username} onChange={e => { setUsername(e.target.value); setUsernameError('') }} placeholder="yourhandle" style={{ width: '100%', background: 'var(--bg3)', border: `1px solid ${usernameError ? 'var(--red)' : 'var(--border)'}`, borderRadius: '8px', padding: '8px 12px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
+                    <input value={username} onChange={e => { setUsername(e.target.value); setUsernameError('') }} style={{ width: '100%', background: 'var(--bg3)', border: `1px solid ${usernameError ? 'var(--red)' : 'var(--border)'}`, borderRadius: '8px', padding: '8px 12px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
                     {usernameError && <div style={{ fontSize: '11px', color: 'var(--red)', marginTop: '3px' }}>{usernameError}</div>}
                   </div>
                 </div>
@@ -372,12 +359,12 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
                 <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '8px', fontWeight: '600' }}>Social links</div>
                 <div style={{ display: 'grid', gap: '8px', marginBottom: '14px' }}>
                   {[
-                    { label: '𝕏 Twitter / X', value: twitter, set: setTwitter, placeholder: 'https://x.com/username' },
+                    { label: '𝕏 Twitter', value: twitter, set: setTwitter, placeholder: 'https://x.com/username' },
                     { label: '💼 LinkedIn', value: linkedin, set: setLinkedin, placeholder: 'https://linkedin.com/in/username' },
                     { label: '🌐 Website', value: website, set: setWebsite, placeholder: 'https://yoursite.com' },
                   ].map(f => (
                     <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '12px', color: 'var(--text3)', width: '110px', flexShrink: 0 }}>{f.label}</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text3)', width: '80px', flexShrink: 0 }}>{f.label}</span>
                       <input value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.placeholder} style={{ flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 11px', color: 'var(--text1)', fontSize: '12px', outline: 'none', fontFamily: 'inherit' }} />
                     </div>
                   ))}
@@ -391,17 +378,13 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
                 <div style={{ fontWeight: '700', fontSize: '20px', marginBottom: '2px' }}>{profile?.name}</div>
                 <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '6px' }}>@{profile?.username}</div>
                 {profile?.bio && <div style={{ fontSize: '14px', color: 'var(--text2)', lineHeight: '1.6', marginBottom: '10px' }}>{profile.bio}</div>}
-
-                {/* Social links */}
-                {(twitter || linkedin || website) && (
+                {(profile?.social_links?.twitter || profile?.social_links?.linkedin || profile?.social_links?.website) && (
                   <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                    {twitter && <a href={twitter} target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', color: 'var(--accent2)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>𝕏 Twitter</a>}
-                    {linkedin && <a href={linkedin} target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', color: 'var(--accent2)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>💼 LinkedIn</a>}
-                    {website && <a href={website} target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', color: 'var(--accent2)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>🌐 Website</a>}
+                    {profile.social_links.twitter && <a href={profile.social_links.twitter} target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', color: 'var(--accent2)', textDecoration: 'none' }}>𝕏 Twitter</a>}
+                    {profile.social_links.linkedin && <a href={profile.social_links.linkedin} target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', color: 'var(--accent2)', textDecoration: 'none' }}>💼 LinkedIn</a>}
+                    {profile.social_links.website && <a href={profile.social_links.website} target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', color: 'var(--accent2)', textDecoration: 'none' }}>🌐 Website</a>}
                   </div>
                 )}
-
-                {/* Stats */}
                 <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
                   {[[posts.length, 'Posts'], [rooms.length, 'Rooms'], [followersCount, 'Followers'], [followingCount, 'Following']].map(([v, l]) => (
                     <div key={l as string}>
@@ -415,33 +398,17 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
           </div>
         </div>
 
-        {/* Reputation card */}
-        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '13px', padding: '16px', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text1)', display: 'flex', alignItems: 'center', gap: '7px' }}>
-                ⭐ Reputation
-                <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '20px', background: 'rgba(99,102,241,.1)', color: 'var(--accent2)', fontWeight: '500' }}>Level {level} · {title}</span>
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
-                {next ? `${rep} / ${next} pts to Level ${level + 1}` : 'Max level reached! 👑'}
-              </div>
-            </div>
-            <div style={{ fontWeight: '800', fontSize: '22px', color: 'var(--accent2)' }}>{rep.toLocaleString()} pts</div>
-          </div>
-          <div style={{ height: '6px', background: 'var(--bg5, #242a38)', borderRadius: '3px', overflow: 'hidden' }}>
-            <div style={{ height: '100%', borderRadius: '3px', background: 'linear-gradient(90deg, var(--accent), #a855f7)', width: `${progress}%`, transition: 'width 1s ease' }} />
-          </div>
-          <div style={{ display: 'flex', gap: '16px', marginTop: '10px', fontSize: '11px', color: 'var(--text3)', flexWrap: 'wrap' }}>
-            <span>+2 per post</span><span>+5 per like</span><span>+3 per comment</span><span>+10 per follower</span>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: '2px', borderBottom: '1px solid var(--border)', marginBottom: '18px', overflowX: 'auto' }}>
-          {(['posts', 'rooms', 'achievements', 'leaderboard'] as const).map(t => (
-            <button key={t} onClick={() => switchTab(t)} style={{ padding: '9px 16px', border: 'none', background: 'none', color: tab === t ? 'var(--accent2)' : 'var(--text3)', borderBottom: `2px solid ${tab === t ? 'var(--accent)' : 'transparent'}`, fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '-1px', transition: 'all .18s', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
-              {t === 'leaderboard' ? '🏆 Leaderboard' : t.charAt(0).toUpperCase() + t.slice(1)}
+        {/* Tabs — no Achievements, added Likes + Saved */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: '18px', overflowX: 'auto' }}>
+          {([
+            ['posts', 'Posts'],
+            ['rooms', 'Rooms'],
+            ['likes', '❤️ Likes'],
+            ['saved', '🔖 Saved'],
+            ['leaderboard', '🏆 Rank'],
+          ] as const).map(([t, label]) => (
+            <button key={t} onClick={() => switchTab(t)} style={{ padding: '9px 14px', border: 'none', background: 'none', color: tab === t ? 'var(--accent2)' : 'var(--text3)', borderBottom: `2px solid ${tab === t ? 'var(--accent)' : 'transparent'}`, fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '-1px', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+              {label}
             </button>
           ))}
         </div>
@@ -474,14 +441,12 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
             </div>
           : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
               {rooms.map((m: any) => {
-                const r = m.rooms
-                if (!r) return null
+                const r = m.rooms; if (!r) return null
                 return (
-                  <div key={m.id} onClick={() => router.push(`/rooms/${r.id}`)} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden', cursor: 'pointer', transition: 'all .2s' }}
-                    onMouseOver={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.11)'}
-                    onMouseOut={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.06)'}
-                  >
-                    <div style={{ height: '70px', background: ROOM_COLORS[r.category] || 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>{r.emoji}</div>
+                  <div key={m.id} onClick={() => router.push(`/rooms/${r.id}`)} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden', cursor: 'pointer' }}>
+                    <div style={{ height: '70px', background: ROOM_COLORS[r.category] || 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', overflow: 'hidden' }}>
+                      {r.icon_url ? <img src={r.icon_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : r.emoji}
+                    </div>
                     <div style={{ padding: '10px' }}>
                       <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '3px' }}>{r.name}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{r.member_count || 0} members</div>
@@ -492,53 +457,37 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
             </div>
         )}
 
-        {/* Achievements tab */}
-        {tab === 'achievements' && (
+        {/* Likes tab — public */}
+        {tab === 'likes' && (
+          likesLoading
+            ? <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}><div className="spinner" /></div>
+            : likedPosts.length === 0
+              ? <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text3)' }}><div style={{ fontSize: '32px', marginBottom: '10px' }}>❤️</div><div style={{ fontSize: '14px' }}>No liked posts yet</div></div>
+              : likedPosts.map((post: any) => <PostCard key={post.id} post={post} />)
+        )}
+
+        {/* Saved tab — private */}
+        {tab === 'saved' && (
           <div>
-            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '14px' }}>{earnedTypes.size} of {ALL_ACHIEVEMENTS.length} earned</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
-              {ALL_ACHIEVEMENTS.map(type => {
-                const meta = ACHIEVEMENT_META[type]
-                const earned = earnedTypes.has(type)
-                return (
-                  <div key={type} style={{ background: earned ? `${meta.color}11` : 'var(--bg2)', border: `1px solid ${earned ? meta.color + '44' : 'var(--border)'}`, borderRadius: '12px', padding: '14px', opacity: earned ? 1 : 0.45 }}>
-                    <div style={{ fontSize: '28px', marginBottom: '8px' }}>{meta.icon}</div>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: earned ? 'var(--text1)' : 'var(--text2)', marginBottom: '3px' }}>{meta.label}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{meta.desc}</div>
-                    {earned && <div style={{ fontSize: '10px', color: meta.color, marginTop: '6px', fontWeight: '600' }}>✓ Earned</div>}
-                  </div>
-                )
-              })}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px', padding: '8px 12px', background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', borderRadius: '8px' }}>
+              <span style={{ fontSize: '14px' }}>🔒</span>
+              <span style={{ fontSize: '12px', color: 'var(--text3)' }}>Saved posts are private — only you can see them</span>
             </div>
+            {savedLoading
+              ? <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}><div className="spinner" /></div>
+              : savedPosts.length === 0
+                ? <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text3)' }}><div style={{ fontSize: '32px', marginBottom: '10px' }}>🔖</div><div style={{ fontSize: '14px' }}>No saved posts yet</div><div style={{ fontSize: '12px', marginTop: '6px' }}>Tap the bookmark icon on any post to save it</div></div>
+                : savedPosts.map((post: any) => <PostCard key={post.id} post={post} />)
+            }
           </div>
         )}
-        {/* Leaderboard tab — embedded mini board */}
+
+        {/* Leaderboard tab */}
         {tab === 'leaderboard' && (
-          <LeaderboardTab
-            profile={profile}
-            leaderboard={leaderboard}
-            myRank={myRank}
-            loading={leaderboardLoading}
-            onLoad={loadLeaderboard}
-            router={router}
-            getColor={getColor}
-          />
+          <LeaderboardTab profile={profile} leaderboard={leaderboard} myRank={myRank} loading={leaderboardLoading} onLoad={loadLeaderboard} router={router} getColor={getColor} />
         )}
 
-        {/* Settings + Sign out */}
-        <div style={{ display: 'flex', gap: '10px', marginTop: '8px', marginBottom: '32px' }}>
-          <button onClick={() => router.push('/settings')} style={{ flex: 1, padding: '11px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text2)', fontSize: '13px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-            Settings
-          </button>
-          <button onClick={signOut} disabled={signingOut} style={{ flex: 1, padding: '11px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '10px', color: 'var(--red)', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}>
-            {signingOut
-              ? <><div className="spinner" />Signing out…</>
-              : <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign Out</>
-            }
-          </button>
-        </div>
-
+        <div style={{ height: '32px' }} />
       </div>
     </div>
   )
