@@ -45,6 +45,14 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
   const [pollVotes, setPollVotes] = useState<Record<string, number>>({})
   const [reporting, setReporting] = useState<string | null>(null)
   const [reportReason, setReportReason] = useState('')
+  const [sharing, setSharing] = useState<any>(null)
+  const [shareTarget, setShareTarget] = useState<'dm' | 'room'>('dm')
+  const [shareSearch, setShareSearch] = useState('')
+  const [shareUsers, setShareUsers] = useState<any[]>([])
+  const [shareRooms, setShareRooms] = useState<any[]>([])
+  const [shareMsg, setShareMsg] = useState('')
+  const [shareSending, setShareSending] = useState(false)
+  const [shareSuccess, setShareSuccess] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
@@ -338,12 +346,45 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
     await supabase.from('poll_votes').insert({ poll_id: pollId, user_id: currentUserId, option_index: optionIndex })
   }
 
+  async function openShare(post: any) {
+    setSharing(post)
+    setShareMsg('')
+    setShareSearch('')
+    setShareSuccess(false)
+    setShareTarget('dm')
+    // Load users + rooms for sharing
+    const [{ data: users }, { data: shareableRooms }] = await Promise.all([
+      supabase.from('profiles').select('id, name, username, avatar_url').neq('id', currentUserId).limit(20),
+      supabase.from('room_members').select('rooms(id, name, emoji)').eq('user_id', currentUserId).limit(20),
+    ])
+    setShareUsers(users || [])
+    setShareRooms((shareableRooms || []).map((r: any) => r.rooms).filter(Boolean))
+  }
+
+  async function sendShare(targetId: string, targetType: 'user' | 'room') {
+    if (!sharing || shareSending) return
+    setShareSending(true)
+    const postUrl = `${window.location.origin}/feed`
+    const content = `${shareMsg ? shareMsg + '\n\n' : ''}📎 Shared post: "${sharing.content?.slice(0, 80)}${sharing.content?.length > 80 ? '…' : ''}"`
+    if (targetType === 'user') {
+      await supabase.from('direct_messages').insert({ from_user: currentUserId, to_user: targetId, content })
+    } else {
+      await supabase.from('messages').insert({ room_id: targetId, user_id: currentUserId, content })
+    }
+    await supabase.from('post_shares').insert({ post_id: sharing.id, shared_by: currentUserId, ...(targetType === 'user' ? { shared_to_user: targetId } : { shared_to_room: targetId }) })
+    setShareSending(false)
+    setShareSuccess(true)
+    setTimeout(() => { setSharing(null); setShareSuccess(false) }, 1500)
+  }
+
+  const filteredShareUsers = shareUsers.filter(u => !shareSearch || u.name?.toLowerCase().includes(shareSearch.toLowerCase()) || u.username?.toLowerCase().includes(shareSearch.toLowerCase()))
+  const filteredShareRooms = shareRooms.filter(r => !shareSearch || r.name?.toLowerCase().includes(shareSearch.toLowerCase()))
+
   async function loadPollData(postId: string) {
     const { data: poll } = await supabase.from('polls').select('*').eq('post_id', postId).single()
     if (!poll) return
     const { data: votes } = await supabase.from('poll_votes').select('*').eq('poll_id', poll.id)
     const { data: myVote } = await supabase.from('poll_votes').select('option_index').eq('poll_id', poll.id).eq('user_id', currentUserId).single()
-    // Count votes per option
     const counts: number[] = poll.options.map((_: any) => 0)
     ;(votes || []).forEach((v: any) => { if (counts[v.option_index] !== undefined) counts[v.option_index]++ })
     const optionsWithVotes = poll.options.map((o: any, i: number) => ({ ...o, votes: counts[i] }))
@@ -524,7 +565,7 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
                     </svg>
                   </button>
                   {/* Share */}
-                  <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/feed`)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text1)', display: 'flex', alignItems: 'center' }}>
+                  <button onClick={() => openShare(post)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text1)', display: 'flex', alignItems: 'center' }}>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
                     </svg>
@@ -595,6 +636,75 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
       </button>
+
+      {/* Share Modal */}
+      {sharing && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(8px)', zIndex: 900, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={e => e.target === e.currentTarget && setSharing(null)}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: '500px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} className="fade-up">
+            {/* Handle */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+              <div style={{ width: '36px', height: '4px', borderRadius: '2px', background: 'var(--bg5)' }} />
+            </div>
+
+            {shareSuccess ? (
+              <div style={{ padding: '40px', textAlign: 'center' }}>
+                <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
+                <div style={{ fontWeight: '700', fontSize: '16px' }}>Shared!</div>
+              </div>
+            ) : (
+              <>
+                <div style={{ padding: '8px 16px 12px', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ fontWeight: '700', fontSize: '15px', marginBottom: '10px' }}>Share Post</div>
+                  {/* Post preview */}
+                  <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px', fontSize: '13px', color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {sharing.content?.slice(0, 100)}
+                  </div>
+                  {/* Message */}
+                  <input value={shareMsg} onChange={e => setShareMsg(e.target.value)} placeholder="Add a message… (optional)" style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit', marginBottom: '10px' }} />
+                  {/* Target tabs */}
+                  <div style={{ display: 'flex', gap: '6px', marginBottom: '4px' }}>
+                    {[['dm','💬 People'], ['room','🚪 Rooms']] .map(([t, label]) => (
+                      <button key={t} onClick={() => { setShareTarget(t as any); setShareSearch('') }} style={{ flex: 1, padding: '7px', background: shareTarget === t ? 'rgba(225,48,108,.12)' : 'var(--bg3)', border: `1px solid ${shareTarget === t ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '8px', color: shareTarget === t ? 'var(--accent)' : 'var(--text2)', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Search */}
+                <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)' }}>
+                  <input value={shareSearch} onChange={e => setShareSearch(e.target.value)} placeholder={shareTarget === 'dm' ? 'Search people…' : 'Search rooms…'} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '10px', padding: '8px 13px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
+                </div>
+
+                {/* List */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+                  {shareTarget === 'dm' && filteredShareUsers.map(u => (
+                    <div key={u.id} onClick={() => sendShare(u.id, 'user')} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', cursor: 'pointer', transition: 'background .15s' }}
+                      onMouseOver={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
+                      onMouseOut={e => (e.currentTarget as HTMLElement).style.background = 'none'}>
+                      <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: getColor(u.name || 'U'), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700', color: '#fff' }}>{(u.name || 'U').charAt(0).toUpperCase()}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '13px', fontWeight: '500' }}>{u.name}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text3)' }}>@{u.username}</div>
+                      </div>
+                      <button style={{ padding: '5px 14px', background: 'var(--ig-gradient)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit', opacity: shareSending ? .6 : 1 }}>Send</button>
+                    </div>
+                  ))}
+                  {shareTarget === 'room' && filteredShareRooms.map(r => (
+                    <div key={r.id} onClick={() => sendShare(r.id, 'room')} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', cursor: 'pointer', transition: 'background .15s' }}
+                      onMouseOver={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
+                      onMouseOut={e => (e.currentTarget as HTMLElement).style.background = 'none'}>
+                      <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'var(--bg4)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>{r.emoji}</div>
+                      <div style={{ flex: 1, fontSize: '13px', fontWeight: '500' }}>{r.name}</div>
+                      <button style={{ padding: '5px 14px', background: 'var(--ig-gradient)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit', opacity: shareSending ? .6 : 1 }}>Share</button>
+                    </div>
+                  ))}
+                  {shareTarget === 'dm' && filteredShareUsers.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text3)', fontSize: '13px' }}>No users found</div>}
+                  {shareTarget === 'room' && filteredShareRooms.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text3)', fontSize: '13px' }}>No rooms found</div>}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Report Modal */}
       {reporting && (

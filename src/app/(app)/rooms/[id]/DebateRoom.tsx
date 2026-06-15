@@ -30,6 +30,8 @@ export default function DebateRoom({ room, currentUser, isMember }: any) {
   const [showCreatePoll, setShowCreatePoll] = useState(false)
   const [pollForm, setPollForm] = useState({ question: '', options: ['', '', ''] })
   const [isOwner, setIsOwner] = useState(false)
+  const [pinnedTakeId, setPinnedTakeId] = useState<string | null>(null)
+  const [closedDebate, setClosedDebate] = useState(false)
   const supabase = createClient()
   const router = useRouter()
 
@@ -153,6 +155,32 @@ export default function DebateRoom({ room, currentUser, isMember }: any) {
     setMyPollVote(optionIndex)
   }
 
+  async function deleteTake(takeId: string) {
+    if (!confirm('Delete this take?')) return
+    await supabase.from('room_takes').delete().eq('id', takeId)
+    setTakes(prev => prev.filter(t => t.id !== takeId))
+  }
+
+  async function pinTake(takeId: string) {
+    setPinnedTakeId(pinnedTakeId === takeId ? null : takeId)
+  }
+
+  async function markWinner(takeId: string) {
+    // Update take with winner flag
+    await supabase.from('room_takes').update({ is_winner: true } as any).eq('id', takeId)
+    setTakes(prev => prev.map(t => ({ ...t, is_winner: t.id === takeId })))
+  }
+
+  async function closeDebate() {
+    setClosedDebate(!closedDebate)
+  }
+
+  async function deletePoll() {
+    if (!poll || !confirm('Delete this poll?')) return
+    await supabase.from('room_polls').delete().eq('id', poll.id)
+    setPoll(null)
+  }
+
   async function createPoll() {
     if (!pollForm.question.trim()) return
     const validOptions = pollForm.options.filter(o => o.trim())
@@ -250,14 +278,35 @@ export default function DebateRoom({ room, currentUser, isMember }: any) {
 
         {/* Post take */}
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px', marginBottom: '16px' }}>
-          <textarea value={newTake} onChange={e => setNewTake(e.target.value)} placeholder={joined ? 'Drop your hot take… 🔥' : 'Join the room to post your take'} disabled={!joined} rows={2}
-            style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '9px', padding: '10px 13px', color: 'var(--text1)', fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit', marginBottom: '10px', opacity: joined ? 1 : 0.5 }} />
+          <textarea value={newTake} onChange={e => setNewTake(e.target.value)} placeholder={!joined ? 'Join the room to post your take' : closedDebate ? 'This debate has been closed' : 'Drop your hot take… 🔥'} disabled={!joined || closedDebate} rows={2}
+            style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '9px', padding: '10px 13px', color: 'var(--text1)', fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit', marginBottom: '10px', opacity: joined && !closedDebate ? 1 : 0.5 }} />
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button onClick={postTake} disabled={!newTake.trim() || !joined || posting} style={{ padding: '7px 16px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: !newTake.trim() || !joined ? .5 : 1, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button onClick={postTake} disabled={!newTake.trim() || !joined || posting || closedDebate} style={{ padding: '7px 16px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: !newTake.trim() || !joined || closedDebate ? .5 : 1, display: 'flex', alignItems: 'center', gap: '6px' }}>
               {posting ? <><div className="spinner" />Posting…</> : 'Post take'}
             </button>
           </div>
         </div>
+
+        {/* Moderation bar — owner only */}
+        {isOwner && (
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
+            <button onClick={closeDebate} style={{ padding: '6px 14px', background: closedDebate ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.08)', border: `1px solid ${closedDebate ? 'rgba(34,197,94,.3)' : 'rgba(239,68,68,.2)'}`, borderRadius: '8px', color: closedDebate ? 'var(--green)' : 'var(--red)', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
+              {closedDebate ? '✅ Debate Closed' : '🔒 Close Debate'}
+            </button>
+            {poll && (
+              <button onClick={deletePoll} style={{ padding: '6px 14px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '8px', color: 'var(--red)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                🗑 Delete Poll
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Closed debate banner */}
+        {closedDebate && (
+          <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '10px', padding: '12px 14px', marginBottom: '14px', textAlign: 'center', fontSize: '13px', color: 'var(--red)', fontWeight: '600' }}>
+            🔒 This debate has been closed by the owner
+          </div>
+        )}
 
         {/* Sort */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
@@ -282,11 +331,15 @@ export default function DebateRoom({ room, currentUser, isMember }: any) {
           </div>
         )}
 
-        {/* Takes */}
         {sortedTakes.map(take => {
           const myVote = myVotes[take.id]
+          const isPinned = pinnedTakeId === take.id
+          const isWinner = (take as any).is_winner
+          const isMyTake = take.user_id === currentUser.id
           return (
-            <div key={take.id} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px', marginBottom: '10px' }}>
+            <div key={take.id} style={{ background: isWinner ? 'linear-gradient(135deg, rgba(234,179,8,.08), rgba(234,179,8,.04))' : isPinned ? 'rgba(99,102,241,.06)' : 'var(--bg2)', border: `1px solid ${isWinner ? 'rgba(234,179,8,.3)' : isPinned ? 'rgba(99,102,241,.3)' : 'var(--border)'}`, borderRadius: '12px', padding: '14px', marginBottom: '10px' }}>
+              {isPinned && <div style={{ fontSize: '11px', color: '#6366f1', fontWeight: '600', marginBottom: '6px' }}>📌 Pinned by owner</div>}
+              {isWinner && <div style={{ fontSize: '11px', color: 'var(--yellow)', fontWeight: '700', marginBottom: '6px' }}>🏆 Winner</div>}
               <div style={{ display: 'flex', gap: '10px' }}>
                 <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: getColor(take.profiles?.name || 'U'), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '700', color: '#fff' }}>
                   {(take.profiles?.name || 'U').charAt(0).toUpperCase()}
@@ -297,12 +350,24 @@ export default function DebateRoom({ room, currentUser, isMember }: any) {
                     <span style={{ fontSize: '11px', color: 'var(--text3)' }}>{timeAgo(take.created_at)}</span>
                   </div>
                   <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: '1.65', marginBottom: '10px' }}>{take.content}</div>
-                  <div style={{ display: 'flex', gap: '7px' }}>
+                  <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <button onClick={() => voteTake(take.id, 'up')} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '7px', border: `1px solid ${myVote === 'up' ? 'rgba(34,197,94,.3)' : 'var(--border)'}`, background: myVote === 'up' ? 'rgba(34,197,94,.1)' : 'none', color: myVote === 'up' ? 'var(--green)' : 'var(--text3)', fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit' }}>↑ {take.up_votes}</button>
                     <button onClick={() => voteTake(take.id, 'down')} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '7px', border: `1px solid ${myVote === 'down' ? 'rgba(239,68,68,.3)' : 'var(--border)'}`, background: myVote === 'down' ? 'rgba(239,68,68,.1)' : 'none', color: myVote === 'down' ? 'var(--red)' : 'var(--text3)', fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit' }}>↓ {take.down_votes}</button>
-                    <span style={{ fontSize: '11px', color: 'var(--text3)', alignSelf: 'center', marginLeft: '4px' }}>
-                      Score: {take.up_votes - take.down_votes > 0 ? '+' : ''}{take.up_votes - take.down_votes}
+                    <span style={{ fontSize: '11px', color: 'var(--text3)', marginLeft: '4px' }}>
+                      {take.up_votes - take.down_votes > 0 ? '+' : ''}{take.up_votes - take.down_votes}
                     </span>
+                    {/* Owner moderation actions */}
+                    {isOwner && (
+                      <div style={{ marginLeft: 'auto', display: 'flex', gap: '5px' }}>
+                        <button onClick={() => pinTake(take.id)} style={{ padding: '3px 8px', background: isPinned ? 'rgba(99,102,241,.15)' : 'none', border: `1px solid ${isPinned ? 'rgba(99,102,241,.3)' : 'var(--border)'}`, borderRadius: '6px', color: isPinned ? '#6366f1' : 'var(--text3)', fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit' }}>📌</button>
+                        <button onClick={() => markWinner(take.id)} style={{ padding: '3px 8px', background: isWinner ? 'rgba(234,179,8,.1)' : 'none', border: `1px solid ${isWinner ? 'rgba(234,179,8,.3)' : 'var(--border)'}`, borderRadius: '6px', color: isWinner ? 'var(--yellow)' : 'var(--text3)', fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit' }}>🏆</button>
+                        <button onClick={() => deleteTake(take.id)} style={{ padding: '3px 8px', background: 'none', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--red)', fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit' }}>🗑</button>
+                      </div>
+                    )}
+                    {/* Own take — delete */}
+                    {!isOwner && isMyTake && (
+                      <button onClick={() => deleteTake(take.id)} style={{ marginLeft: 'auto', padding: '3px 8px', background: 'none', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text3)', fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit' }}>Delete</button>
+                    )}
                   </div>
                 </div>
               </div>
