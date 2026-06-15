@@ -122,6 +122,11 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
   const [coverUrl, setCoverUrl] = useState(profile?.cover_url || '')
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
+  const [showFollowers, setShowFollowers] = useState(false)
+  const [showFollowing, setShowFollowing] = useState(false)
+  const [followersList, setFollowersList] = useState<any[]>([])
+  const [followingList, setFollowingList] = useState<any[]>([])
+  const [followListLoading, setFollowListLoading] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const avatarRef = useRef<HTMLInputElement>(null)
   const coverRef = useRef<HTMLInputElement>(null)
@@ -132,6 +137,28 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
     setSigningOut(true)
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  async function openFollowers() {
+    setShowFollowers(true)
+    if (followersList.length > 0) return
+    setFollowListLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: rows } = await supabase.from('follows').select('profiles!follower_id(id, name, username, avatar_url)').eq('following_id', user.id)
+    setFollowersList((rows || []).map((r: any) => r.profiles).filter(Boolean))
+    setFollowListLoading(false)
+  }
+
+  async function openFollowing() {
+    setShowFollowing(true)
+    if (followingList.length > 0) return
+    setFollowListLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: rows } = await supabase.from('follows').select('profiles!following_id(id, name, username, avatar_url)').eq('follower_id', user.id)
+    setFollowingList((rows || []).map((r: any) => r.profiles).filter(Boolean))
+    setFollowListLoading(false)
   }
 
   useEffect(() => { if (!initialProfile) loadProfile() }, [])
@@ -386,10 +413,13 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-                  {[[posts.length, 'Posts'], [rooms.length, 'Rooms'], [followersCount, 'Followers'], [followingCount, 'Following']].map(([v, l]) => (
-                    <div key={l as string}>
+                  {[[posts.length, 'Posts', null], [rooms.length, 'Rooms', null], [followersCount, 'Followers', openFollowers], [followingCount, 'Following', openFollowing]].map(([v, l, fn]) => (
+                    <div key={l as string} onClick={() => fn && (fn as any)()} style={{ cursor: fn ? 'pointer' : 'default' }}
+                      onMouseOver={e => { if (fn) (e.currentTarget as HTMLElement).style.opacity = '.7' }}
+                      onMouseOut={e => { if (fn) (e.currentTarget as HTMLElement).style.opacity = '1' }}
+                    >
                       <div style={{ fontWeight: '700', fontSize: '17px' }}>{v}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{l}</div>
+                      <div style={{ fontSize: '11px', color: fn ? 'var(--accent2)' : 'var(--text3)', textDecoration: fn ? 'underline' : 'none' }}>{l as string}</div>
                     </div>
                   ))}
                 </div>
@@ -489,6 +519,49 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
 
         <div style={{ height: '32px' }} />
       </div>
+
+      {/* Followers/Following Modal */}
+      {(showFollowers || showFollowing) && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+          onClick={e => e.target === e.currentTarget && (setShowFollowers(false), setShowFollowing(false))}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: '500px', maxHeight: '70vh', display: 'flex', flexDirection: 'column' }} className="fade-up">
+            {/* Handle */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+              <div style={{ width: '36px', height: '4px', borderRadius: '2px', background: 'var(--bg5)' }} />
+            </div>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px 12px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ fontWeight: '700', fontSize: '16px' }}>{showFollowers ? 'Followers' : 'Following'}</div>
+              <button onClick={() => { setShowFollowers(false); setShowFollowing(false) }} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '22px', lineHeight: 1 }}>×</button>
+            </div>
+            {/* List */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+              {followListLoading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}><div className="spinner" /></div>
+              ) : (showFollowers ? followersList : followingList).length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text3)', fontSize: '14px' }}>
+                  {showFollowers ? 'No followers yet' : 'Not following anyone yet'}
+                </div>
+              ) : (showFollowers ? followersList : followingList).map((u: any) => (
+                <div key={u.id} onClick={() => { router.push(`/users/${u.username}`); setShowFollowers(false); setShowFollowing(false) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', cursor: 'pointer', transition: 'background .15s' }}
+                  onMouseOver={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
+                  onMouseOut={e => (e.currentTarget as HTMLElement).style.background = 'none'}
+                >
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: u.avatar_url ? 'none' : getColor(u.name || 'U'), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '700', color: '#fff', overflow: 'hidden' }}>
+                    {u.avatar_url ? <img src={u.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : (u.name || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text1)' }}>{u.name}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text3)' }}>@{u.username}</div>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
