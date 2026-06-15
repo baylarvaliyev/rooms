@@ -138,7 +138,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* SIDEBAR — desktop */}
       <nav className="app-sidebar">
-        <div onClick={() => router.push('/feed')} style={{ width: '36px', height: '36px', background: 'var(--ig-gradient)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '17px', color: '#fff', cursor: 'pointer', marginBottom: '8px' }}>R</div>
+        <div onClick={() => router.push('/feed')} style={{ width: '40px', height: '40px', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', marginBottom: '8px', flexShrink: 0 }}>
+          <img src="/icon-192.png" alt="Rooms" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </div>
 
         {NAV.map(n => {
           const isActive = activeId === n.id && !isRoom && !isUser
@@ -178,7 +180,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
           )}
-          <div style={{ fontWeight: '700', fontSize: '16px', color: 'var(--text1)', flex: 1, letterSpacing: '-0.3px' }}>
+          <div style={{ fontWeight: '700', fontSize: '16px', color: 'var(--text1)', flex: 1, letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {!isRoom && !isUser && activeId === 'feed' && (
+              <img src="/icon-48.png" alt="" style={{ width: '26px', height: '26px', borderRadius: '6px' }} />
+            )}
             {isRoom || isUser ? '' : activeId === 'feed' ? 'Rooms' : NAV.find(n => n.id === activeId)?.label || 'Rooms'}
           </div>
           {/* Only notifications bell in topbar — messages removed (it's in bottom nav) */}

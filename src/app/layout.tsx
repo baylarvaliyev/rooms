@@ -49,8 +49,16 @@ export const metadata: Metadata = {
     images: ['/og-image.png'],
   },
   icons: {
-    icon: '/favicon.ico',
-    apple: '/apple-touch-icon.png',
+    icon: [
+      { url: '/favicon-16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon-192.png',   sizes: '192x192', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/icon-180.png', sizes: '180x180', type: 'image/png' },
+      { url: '/icon-152.png', sizes: '152x152', type: 'image/png' },
+    ],
+    shortcut: '/favicon-32.png',
   },
   manifest: '/manifest.json',
 }
@@ -65,6 +73,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Rooms" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/icon-152.png" />
       </head>
       <body className={inter.className} style={{ background: 'var(--bg0)' }}>
         {children}

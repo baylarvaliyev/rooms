@@ -9,10 +9,34 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
+      "src": "/icon-48.png",
+      "sizes": "48x48",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png"
     },
     {
       "src": "/icon-192.png",
@@ -32,12 +56,14 @@
     {
       "name": "Explore Rooms",
       "url": "/explore",
-      "description": "Browse all rooms"
+      "description": "Browse all rooms",
+      "icons": [{ "src": "/icon-96.png", "sizes": "96x96" }]
     },
     {
       "name": "Messages",
       "url": "/messages",
-      "description": "Your direct messages"
+      "description": "Your direct messages",
+      "icons": [{ "src": "/icon-96.png", "sizes": "96x96" }]
     }
   ]
 }
