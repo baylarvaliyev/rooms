@@ -18,6 +18,25 @@ function timeAgo(date: string) {
   return `${Math.floor(s/86400)}d`
 }
 
+// Parse a message — returns { type, text, post } 
+function parseMessage(content: string) {
+  if (content.startsWith('__SHARED_POST__')) {
+    const body = content.slice('__SHARED_POST__'.length)
+    const sepIdx = body.indexOf('|||')
+    let note = ''
+    let jsonStr = body
+    if (sepIdx !== -1) {
+      note = body.slice(0, sepIdx)
+      jsonStr = body.slice(sepIdx + 3)
+    }
+    try {
+      const post = JSON.parse(jsonStr)
+      return { type: 'shared_post', note, post }
+    } catch {}
+  }
+  return { type: 'text', note: '', post: null }
+}
+
 export default function MessagesClient() {
   const [currentUserId, setCurrentUserId] = useState('')
   const [currentUserName, setCurrentUserName] = useState('')
@@ -278,7 +297,8 @@ export default function MessagesClient() {
                   </div>
                   {u.lastMsg && (
                     <div style={{ fontSize: '12px', color: 'var(--text3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {u.lastMsg.isMe ? 'You: ' : ''}{u.lastMsg.content}
+                      {u.lastMsg.isMe ? 'You: ' : ''}
+                      {u.lastMsg.content.startsWith('__SHARED_POST__') ? '📎 Shared a post' : u.lastMsg.content}
                     </div>
                   )}
                 </div>
@@ -325,6 +345,8 @@ export default function MessagesClient() {
                 const isMe = msg.from_user === currentUserId
                 const prevMsg = messages[i - 1]
                 const showAvatar = !isMe && (!prevMsg || prevMsg.from_user !== msg.from_user)
+                const parsed = parseMessage(msg.content)
+
                 return (
                   <div key={msg.id || i} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: '6px' }}>
                     {!isMe && (
@@ -335,14 +357,47 @@ export default function MessagesClient() {
                         )}
                       </div>
                     )}
-                    <div style={{ maxWidth: '72%', padding: '9px 13px', borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: isMe ? 'var(--accent)' : 'var(--bg3)', color: isMe ? '#fff' : 'var(--text1)', border: isMe ? 'none' : '1px solid var(--border)', fontSize: '14px', lineHeight: '1.5', wordBreak: 'break-word' }}>
-                      {msg.content}
-                      {isMe && (
-                        <div style={{ fontSize: '10px', opacity: .7, marginTop: '2px', textAlign: 'right' }}>
-                          {msg.read_at ? '✓✓' : '✓'}
+
+                    {parsed.type === 'shared_post' && parsed.post ? (
+                      <div style={{ maxWidth: '80%' }}>
+                        {/* Optional note above the card */}
+                        {parsed.note && (
+                          <div style={{ padding: '6px 12px', marginBottom: '4px', fontSize: '13px', color: isMe ? '#fff' : 'var(--text1)', background: isMe ? 'var(--accent)' : 'var(--bg3)', borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px', border: isMe ? 'none' : '1px solid var(--border)' }}>
+                            {parsed.note}
+                          </div>
+                        )}
+                        {/* Post card */}
+                        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '14px', overflow: 'hidden', maxWidth: '280px' }}>
+                          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              📎 Shared post
+                              {parsed.post.room && <><span>·</span><span>{parsed.post.room_emoji} {parsed.post.room}</span></>}
+                            </div>
+                            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text2)', marginBottom: '6px' }}>{parsed.post.author}</div>
+                            <div style={{ fontSize: '13px', color: 'var(--text1)', lineHeight: '1.5', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                              {parsed.post.content}
+                            </div>
+                          </div>
+                          {parsed.post.media_url && (
+                            <img src={parsed.post.media_url} alt="" style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', display: 'block' }} />
+                          )}
+                          <div style={{ padding: '8px 12px', display: 'flex', gap: '12px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text3)' }}>❤️ {parsed.post.like_count}</span>
+                            <span style={{ fontSize: '11px', color: 'var(--text3)' }}>💬 {parsed.post.comment_count}</span>
+                          </div>
                         </div>
-                      )}
-                    </div>
+                        {isMe && <div style={{ fontSize: '10px', color: 'var(--text3)', textAlign: 'right', marginTop: '2px' }}>{msg.read_at ? '✓✓' : '✓'}</div>}
+                      </div>
+                    ) : (
+                      <div style={{ maxWidth: '72%', padding: '9px 13px', borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: isMe ? 'var(--accent)' : 'var(--bg3)', color: isMe ? '#fff' : 'var(--text1)', border: isMe ? 'none' : '1px solid var(--border)', fontSize: '14px', lineHeight: '1.5', wordBreak: 'break-word' }}>
+                        {msg.content}
+                        {isMe && (
+                          <div style={{ fontSize: '10px', opacity: .7, marginTop: '2px', textAlign: 'right' }}>
+                            {msg.read_at ? '✓✓' : '✓'}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               })}

@@ -364,14 +364,30 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
   async function sendShare(targetId: string, targetType: 'user' | 'room') {
     if (!sharing || shareSending) return
     setShareSending(true)
-    const postUrl = `${window.location.origin}/feed`
-    const content = `${shareMsg ? shareMsg + '\n\n' : ''}📎 Shared post: "${sharing.content?.slice(0, 80)}${sharing.content?.length > 80 ? '…' : ''}"`
+
+    // Embed the full post data as JSON so receiver sees a proper card
+    const postData = {
+      id: sharing.id,
+      content: sharing.content,
+      media_url: sharing.media_url || null,
+      like_count: sharing.like_count || 0,
+      comment_count: sharing.comment_count || 0,
+      author: sharing.profiles?.name || 'Unknown',
+      room: sharing.rooms?.name || null,
+      room_emoji: sharing.rooms?.emoji || null,
+    }
+    // Special prefix so MessagesClient knows to render as a post card
+    const content = `__SHARED_POST__${shareMsg ? shareMsg + '|||' : ''}${JSON.stringify(postData)}`
+
     if (targetType === 'user') {
       await supabase.from('direct_messages').insert({ from_user: currentUserId, to_user: targetId, content })
     } else {
       await supabase.from('messages').insert({ room_id: targetId, user_id: currentUserId, content })
     }
-    await supabase.from('post_shares').insert({ post_id: sharing.id, shared_by: currentUserId, ...(targetType === 'user' ? { shared_to_user: targetId } : { shared_to_room: targetId }) })
+    await supabase.from('post_shares').insert({
+      post_id: sharing.id, shared_by: currentUserId,
+      ...(targetType === 'user' ? { shared_to_user: targetId } : { shared_to_room: targetId })
+    })
     setShareSending(false)
     setShareSuccess(true)
     setTimeout(() => { setSharing(null); setShareSuccess(false) }, 1500)
