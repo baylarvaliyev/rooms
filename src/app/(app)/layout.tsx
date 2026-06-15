@@ -4,7 +4,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
 
-// Clean SVG icons — Instagram style
 const Icons = {
   home: (active: boolean) => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -12,12 +11,14 @@ const Icons = {
       <polyline points="9 22 9 12 15 12 15 22"/>
     </svg>
   ),
+  // Explore = compass
   explore: (active: boolean) => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8"/>
-      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      <circle cx="12" cy="12" r="10"/>
+      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
     </svg>
   ),
+  // Search = magnifier with + inside (different from explore)
   search: (active: boolean) => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="11" cy="11" r="8"/>
@@ -50,13 +51,13 @@ const Icons = {
 }
 
 const NAV = [
-  { id: 'feed',          icon: Icons.home,         path: '/feed',          label: 'Home' },
-  { id: 'explore',       icon: Icons.explore,      path: '/explore',       label: 'Explore' },
-  { id: 'search',        icon: Icons.search,       path: '/search',        label: 'Search' },
-  { id: 'messages',      icon: Icons.messages,     path: '/messages',      label: 'Messages' },
-  { id: 'notifications', icon: Icons.notifications,path: '/notifications', label: 'Notifications' },
-  { id: 'leaderboard',   icon: Icons.leaderboard,  path: '/leaderboard',   label: 'Leaderboard' },
-  { id: 'settings',      icon: Icons.settings,     path: '/settings',      label: 'Settings' },
+  { id: 'feed',          icon: Icons.home,          path: '/feed',          label: 'Home' },
+  { id: 'explore',       icon: Icons.explore,       path: '/explore',       label: 'Explore' },
+  { id: 'search',        icon: Icons.search,        path: '/search',        label: 'Search' },
+  { id: 'messages',      icon: Icons.messages,      path: '/messages',      label: 'Messages' },
+  { id: 'notifications', icon: Icons.notifications, path: '/notifications', label: 'Notifications' },
+  { id: 'leaderboard',   icon: Icons.leaderboard,   path: '/leaderboard',   label: 'Leaderboard' },
+  { id: 'settings',      icon: Icons.settings,      path: '/settings',      label: 'Settings' },
 ]
 
 const MOBILE_NAV = [
@@ -76,29 +77,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [notifCount, setNotifCount] = useState(0)
   const [dmCount, setDmCount] = useState(0)
 
-  // SECURITY: Detect if user changes mid-session (e.g. someone signs up on same browser)
-  // If the auth user changes, clear state and redirect to login immediately
+  // SECURITY: Detect user change mid-session
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const newUserId = session?.user?.id || null
-
       if (event === 'SIGNED_OUT') {
-        setProfile(null)
-        setCurrentUserId(null)
-        router.push('/login')
-        return
+        setProfile(null); setCurrentUserId(null); router.push('/login'); return
       }
-
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (currentUserId && newUserId && newUserId !== currentUserId) {
-          // Different user logged in on same browser — force full page reload
-          // This clears all React state and prevents session mixing
-          window.location.href = '/feed'
-          return
+          window.location.href = '/feed'; return
         }
-        if (newUserId && !currentUserId) {
-          setCurrentUserId(newUserId)
-        }
+        if (newUserId && !currentUserId) setCurrentUserId(newUserId)
       }
     })
     return () => subscription.unsubscribe()
@@ -120,7 +110,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       channel = supabase.channel(`layout:${user.id}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => setNotifCount(p => p + 1))
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `to_user=eq.${user.id}` }, () => {
-          // Only show badge if not on messages page
           if (!window.location.pathname.startsWith('/messages')) setDmCount(p => p + 1)
         })
         .subscribe()
@@ -132,8 +121,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => { if (pathname === '/notifications') setNotifCount(0) }, [pathname])
   useEffect(() => { if (pathname.startsWith('/messages')) setDmCount(0) }, [pathname])
 
-  async function signOut() { await supabase.auth.signOut(); router.push('/login') }
-
   const activeId = NAV.find(n => pathname.startsWith(n.path))?.id ||
     (pathname.startsWith('/profile') ? 'profile' : 'feed')
   const isRoom = pathname.startsWith('/rooms/')
@@ -142,10 +129,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="app-shell">
 
-      {/* SIDEBAR — desktop only */}
+      {/* SIDEBAR — desktop */}
       <nav className="app-sidebar">
-        {/* Logo */}
-        <div onClick={() => router.push('/feed')} style={{ width: '36px', height: '36px', background: 'var(--ig-gradient)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '17px', color: '#fff', cursor: 'pointer', marginBottom: '8px', letterSpacing: '-1px' }}>R</div>
+        <div onClick={() => router.push('/feed')} style={{ width: '36px', height: '36px', background: 'var(--ig-gradient)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '17px', color: '#fff', cursor: 'pointer', marginBottom: '8px' }}>R</div>
 
         {NAV.map(n => {
           const isActive = activeId === n.id && !isRoom && !isUser
@@ -167,7 +153,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         <div style={{ flex: 1 }} />
 
-        {/* Profile avatar */}
         <div onClick={() => router.push('/profile')} style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', border: activeId === 'profile' ? '2px solid var(--text1)' : '1.5px solid var(--bg4)', transition: 'border .15s' }}>
           {profile?.avatar_url
             ? <img src={profile.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -183,29 +168,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="app-topbar">
           {(isRoom || isUser) && (
             <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: 'var(--text1)', cursor: 'pointer', padding: '0', minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6"/>
-              </svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
           )}
           <div style={{ fontWeight: '700', fontSize: '16px', color: 'var(--text1)', flex: 1, letterSpacing: '-0.3px' }}>
             {isRoom || isUser ? '' : activeId === 'feed' ? 'Rooms' : NAV.find(n => n.id === activeId)?.label || 'Rooms'}
           </div>
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            {/* Notifications always visible on mobile topbar */}
-            <button onClick={() => router.push('/notifications')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text1)', position: 'relative', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {Icons.notifications(false)}
-              {notifCount > 0 && <div style={{ position: 'absolute', top: '8px', right: '8px', width: '8px', height: '8px', background: 'var(--red)', borderRadius: '50%', border: '1.5px solid var(--bg0)' }} />}
-            </button>
-            {activeId === 'feed' && (
-              <button onClick={() => router.push('/messages')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text1)', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {Icons.messages(false)}
-              </button>
-            )}
-          </div>
+          {/* Only notifications bell in topbar — messages removed (it's in bottom nav) */}
+          <button onClick={() => router.push('/notifications')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text1)', position: 'relative', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {Icons.notifications(false)}
+            {notifCount > 0 && <div style={{ position: 'absolute', top: '8px', right: '8px', width: '8px', height: '8px', background: 'var(--red)', borderRadius: '50%', border: '1.5px solid var(--bg0)' }} />}
+          </button>
         </div>
 
-        {/* PAGE CONTENT */}
         <div className="app-content">{children}</div>
       </div>
 
@@ -225,9 +200,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               ) : (
                 <div style={{ position: 'relative' }}>
                   {n.icon!(isActive)}
-                  {n.id === 'notifications' && notifCount > 0 && (
-                    <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '8px', height: '8px', background: 'var(--red)', borderRadius: '50%', border: '1.5px solid var(--bg0)' }} />
-                  )}
                   {n.id === 'messages' && dmCount > 0 && (
                     <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '8px', height: '8px', background: 'var(--accent)', borderRadius: '50%', border: '1.5px solid var(--bg0)' }} />
                   )}

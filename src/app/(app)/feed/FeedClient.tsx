@@ -392,8 +392,25 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
     setPosts((prev: any[]) => prev.map(p => p.id === postId ? { ...p, _poll: { ...poll, options: optionsWithVotes } } : p))
   }
 
-  const name = profile?.name || 'You'
-  const color = getColor(name)
+  const [refreshing, setRefreshing] = useState(false)
+  const touchStartY = useRef(0)
+
+  async function handleRefresh() {
+    if (refreshing) return
+    setRefreshing(true)
+    await loadFeed()
+    setRefreshing(false)
+  }
+
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartY.current = e.touches[0].clientY
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    const diff = e.changedTouches[0].clientY - touchStartY.current
+    const el = e.currentTarget as HTMLElement
+    if (diff > 80 && el.scrollTop <= 0) handleRefresh()
+  }
 
   if (dataLoading) {
     return (
@@ -417,8 +434,18 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
     )
   }
 
+  const name = profile?.name || 'You'
+  const color = getColor(name)
+
   return (
-    <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg0)' }}>
+    <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg0)' }} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      {/* Pull to refresh indicator */}
+      {refreshing && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px', gap: '8px', borderBottom: '1px solid var(--border)' }}>
+          <div className="spinner" />
+          <span style={{ fontSize: '13px', color: 'var(--text3)' }}>Refreshing…</span>
+        </div>
+      )}
       <div style={{ maxWidth: '470px', margin: '0 auto' }}>
 
         {/* Rooms row — square tiles with neon borders */}

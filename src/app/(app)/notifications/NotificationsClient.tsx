@@ -18,10 +18,12 @@ function timeAgo(date: string) {
 }
 
 const NOTIF_META: Record<string, { icon: string, label: string }> = {
-  like:     { icon: '❤️', label: 'liked your post' },
-  comment:  { icon: '💬', label: 'commented on your post' },
-  follow:   { icon: '👤', label: 'started following you' },
-  post:     { icon: '✍️', label: 'posted in' },
+  like:       { icon: '❤️', label: 'liked your post' },
+  comment:    { icon: '💬', label: 'commented on your post' },
+  follow:     { icon: '👤', label: 'started following you' },
+  post:       { icon: '✍️', label: 'posted in' },
+  room_event: { icon: '📅', label: 'scheduled an event' },
+  mention:    { icon: '@️', label: 'mentioned you' },
 }
 
 export default function NotificationsClient() {
@@ -40,7 +42,7 @@ export default function NotificationsClient() {
 
     const { data } = await supabase
       .from('notifications')
-      .select('*, actor:profiles!notifications_actor_id_fkey(name, username, avatar_url)')
+      .select('*, actor:profiles!actor_id(name, username, avatar_url)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(50)
@@ -84,36 +86,33 @@ export default function NotificationsClient() {
 
         {notifications.map(n => {
           const meta = NOTIF_META[n.type] || { icon: '🔔', label: 'activity' }
-          const actorName = n.actor?.name || 'Someone'
+          const actorName = n.actor?.name || (n.type === 'room_event' ? 'Room' : 'Someone')
           const color = getColor(actorName)
+          // For room_event notifications, show the content directly
+          const displayText = n.type === 'room_event' && n.content
+            ? n.content
+            : `${actorName} ${meta.label}${n.room_name ? ` in ${n.room_name}` : ''}`
           return (
             <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', borderBottom: '1px solid var(--border)', background: n.read ? 'transparent' : 'rgba(225,48,108,.04)', cursor: 'pointer', transition: 'background .18s' }}
-              onClick={() => n.actor?.username && router.push(`/users/${n.actor.username}`)}
+              onClick={() => n.type === 'room_event' && n.room_id ? router.push(`/rooms/${n.room_id}`) : n.actor?.username && router.push(`/users/${n.actor.username}`)}
               onMouseOver={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg2)'}
               onMouseOut={e => (e.currentTarget as HTMLElement).style.background = n.read ? 'transparent' : 'rgba(225,48,108,.04)'}
             >
-              {/* Avatar */}
               <div style={{ position: 'relative', flexShrink: 0 }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: n.actor?.avatar_url ? 'none' : color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '700', color: '#fff', overflow: 'hidden' }}>
-                  {n.actor?.avatar_url
-                    ? <img src={n.actor.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    : actorName.charAt(0).toUpperCase()
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: n.actor?.avatar_url ? 'none' : color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: n.type === 'room_event' ? '24px' : '16px', fontWeight: '700', color: '#fff', overflow: 'hidden' }}>
+                  {n.type === 'room_event'
+                    ? '📅'
+                    : n.actor?.avatar_url
+                      ? <img src={n.actor.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : actorName.charAt(0).toUpperCase()
                   }
                 </div>
-                <div style={{ position: 'absolute', bottom: 0, right: 0, fontSize: '14px', lineHeight: 1 }}>{meta.icon}</div>
+                {n.type !== 'room_event' && <div style={{ position: 'absolute', bottom: 0, right: 0, fontSize: '14px', lineHeight: 1 }}>{meta.icon}</div>}
               </div>
-
-              {/* Content */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '14px', color: 'var(--text1)', lineHeight: '1.5' }}>
-                  <span style={{ fontWeight: '600' }}>{actorName}</span>
-                  {' '}{meta.label}
-                  {n.room_name && <span style={{ color: 'var(--text3)' }}> {n.room_name}</span>}
-                </div>
+                <div style={{ fontSize: '14px', color: 'var(--text1)', lineHeight: '1.5' }}>{displayText}</div>
                 <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>{timeAgo(n.created_at)}</div>
               </div>
-
-              {/* Unread dot */}
               {!n.read && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />}
             </div>
           )

@@ -31,7 +31,7 @@ export default function SearchPage() {
   const [posts, setPosts] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
-  const [tab, setTab] = useState<'all'|'people'|'rooms'|'posts'>('all')
+  const [tab, setTab] = useState<'all'|'people'|'posts'>('all')
 
   // Discovery state
   const [suggestedUsers, setSuggestedUsers] = useState<any[]>([])
@@ -188,16 +188,20 @@ export default function SearchPage() {
         {/* SEARCH RESULTS */}
         {searched && query.trim() && (
           <>
-            {/* Tabs */}
+            {/* Tabs — no Rooms tab, use Explore for that */}
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
-              {[['all','All'], ['people','People'], ['rooms','Rooms'], ['posts','Posts']].map(([id, label]) => (
+              {[['all','All'], ['people','People'], ['posts','Posts']].map(([id, label]) => (
                 <button key={id} onClick={() => setTab(id as any)} style={{ padding: '8px 14px', border: 'none', background: 'none', color: tab === id ? 'var(--text1)' : 'var(--text3)', borderBottom: `2px solid ${tab === id ? 'var(--accent)' : 'transparent'}`, fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '-1px', fontFamily: 'inherit' }}>{label}</button>
               ))}
+              <div style={{ flex: 1 }} />
+              <button onClick={() => router.push('/explore')} style={{ padding: '8px 12px', border: 'none', background: 'none', color: 'var(--text3)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                🧭 Find Rooms →
+              </button>
             </div>
 
             {loading && <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}><div className="spinner" /></div>}
 
-            {!loading && users.length === 0 && rooms.length === 0 && posts.length === 0 && (
+            {!loading && users.length === 0 && posts.length === 0 && (
               <div style={{ textAlign: 'center', padding: '48px 20px' }}>
                 <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔍</div>
                 <div style={{ fontWeight: '600', fontSize: '16px', marginBottom: '4px' }}>No results for "{query}"</div>
@@ -222,30 +226,6 @@ export default function SearchPage() {
                       </div>
                       <button onClick={() => following.has(u.id) ? unfollowUser(u.id) : followUser(u.id)} style={{ padding: '6px 14px', borderRadius: '20px', border: `1px solid ${following.has(u.id) ? 'var(--border)' : 'var(--accent)'}`, background: following.has(u.id) ? 'var(--bg3)' : 'rgba(225,48,108,.1)', color: following.has(u.id) ? 'var(--text3)' : 'var(--accent)', fontSize: '12px', fontWeight: '600', cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit' }}>
                         {following.has(u.id) ? 'Following' : 'Follow'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Room results */}
-            {!loading && (tab === 'all' || tab === 'rooms') && rooms.length > 0 && (
-              <div style={{ marginBottom: '20px' }}>
-                {tab === 'all' && <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: '10px' }}>Rooms</div>}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {rooms.map(r => (
-                    <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px' }}>
-                      <div onClick={() => router.push(`/rooms/${r.id}`)} style={{ width: '46px', height: '46px', borderRadius: '12px', background: r.cover_url ? 'none' : (ROOM_COLORS[r.category] || 'var(--bg4)'), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', overflow: 'hidden', cursor: 'pointer' }}>
-                        {r.icon_url ? <img src={r.icon_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : r.emoji}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => router.push(`/rooms/${r.id}`)}>
-                        <div style={{ fontSize: '14px', fontWeight: '600' }}>{r.name}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{r.category} · {r.member_count || 0} members</div>
-                        {r.description && <div style={{ fontSize: '12px', color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>{r.description}</div>}
-                      </div>
-                      <button onClick={() => followRoom(r.id)} style={{ padding: '6px 14px', borderRadius: '20px', border: `1px solid ${followingRooms.has(r.id) ? 'var(--border)' : 'var(--accent)'}`, background: followingRooms.has(r.id) ? 'var(--bg3)' : 'rgba(225,48,108,.1)', color: followingRooms.has(r.id) ? 'var(--text3)' : 'var(--accent)', fontSize: '12px', fontWeight: '600', cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit' }}>
-                        {followingRooms.has(r.id) ? '✓ Following' : 'Follow'}
                       </button>
                     </div>
                   ))}

@@ -44,32 +44,24 @@ export default function MessagesClient() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Real-time DM listener
+  // Real-time DM listener — global for this user
   useEffect(() => {
     if (!currentUserId) return
     const channel = supabase.channel(`dms:${currentUserId}`)
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'direct_messages',
+        filter: `to_user=eq.${currentUserId}`,
       }, async (payload) => {
         const msg = payload.new as any
-        const isForMe = msg.to_user === currentUserId || msg.from_user === currentUserId
-        if (!isForMe) return
-        // If in the relevant conversation, add message
+        // Add to current conversation if it's the right one
         setActiveUser((au: any) => {
-          if (au && (
-            (msg.from_user === currentUserId && msg.to_user === au.id) ||
-            (msg.from_user === au.id && msg.to_user === currentUserId)
-          )) {
-            setMessages(prev => {
-              // Avoid duplicates (we already added it optimistically when sending)
-              if (prev.find(m => m.id === msg.id)) return prev
-              return [...prev, msg]
-            })
+          if (au && msg.from_user === au.id) {
+            setMessages(prev => prev.find(m => m.id === msg.id) ? prev : [...prev, msg])
           }
           return au
         })
-        // Refresh conversation list to update last message
-        setCurrentUserId(id => { loadConversations(id); return id })
+        // Refresh conversation list
+        loadConversations(currentUserId)
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
