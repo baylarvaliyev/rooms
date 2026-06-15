@@ -54,6 +54,7 @@ export default function MessagesClient() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set())
   const typingTimeoutRef = useRef<any>(null)
+  const [viewingPost, setViewingPost] = useState<any>(null)
   const searchParams = useSearchParams()
   const supabase = createClient()
 
@@ -380,8 +381,11 @@ export default function MessagesClient() {
                             {parsed.note}
                           </div>
                         )}
-                        {/* Post card */}
-                        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '14px', overflow: 'hidden', maxWidth: '280px' }}>
+                        {/* Post card — clickable */}
+                        <div onClick={() => setViewingPost(parsed.post)} style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '14px', overflow: 'hidden', maxWidth: '280px', cursor: 'pointer', transition: 'opacity .15s' }}
+                          onMouseOver={e => (e.currentTarget as HTMLElement).style.opacity = '.85'}
+                          onMouseOut={e => (e.currentTarget as HTMLElement).style.opacity = '1'}
+                        >
                           <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
                             <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               📎 Shared post
@@ -440,6 +444,49 @@ export default function MessagesClient() {
           </>
         )}
       </div>
+      {/* Post View Modal — tap a shared post to see full details */}
+      {viewingPost && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.9)', backdropFilter: 'blur(12px)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+          onClick={e => e.target === e.currentTarget && setViewingPost(null)}>
+          <div style={{ background: 'var(--bg2)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: '560px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} className="fade-up">
+            {/* Handle */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+              <div style={{ width: '36px', height: '4px', borderRadius: '2px', background: 'var(--bg5)' }} />
+            </div>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 16px 12px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: '600', fontSize: '14px' }}>{viewingPost.author}</div>
+                {viewingPost.room && <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{viewingPost.room_emoji} {viewingPost.room}</div>}
+              </div>
+              <button onClick={() => setViewingPost(null)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '22px', lineHeight: 1 }}>×</button>
+            </div>
+            {/* Content */}
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {viewingPost.media_url && (
+                <img src={viewingPost.media_url} alt="" style={{ width: '100%', maxHeight: '400px', objectFit: 'contain', background: '#000', display: 'block' }} />
+              )}
+              {viewingPost.content && (
+                <div style={{ padding: '16px', fontSize: '15px', color: 'var(--text1)', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}>
+                  {viewingPost.content}
+                </div>
+              )}
+              <div style={{ padding: '0 16px 16px', display: 'flex', gap: '16px' }}>
+                <span style={{ fontSize: '13px', color: 'var(--text3)' }}>❤️ {viewingPost.like_count} likes</span>
+                <span style={{ fontSize: '13px', color: 'var(--text3)' }}>💬 {viewingPost.comment_count} comments</span>
+              </div>
+            </div>
+            {/* Go to room button */}
+            {viewingPost.room_id && (
+              <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+                <a href={`/rooms/${viewingPost.room_id}`} style={{ display: 'block', width: '100%', padding: '12px', background: 'var(--ig-gradient)', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '14px', fontWeight: '600', cursor: 'pointer', textAlign: 'center', textDecoration: 'none' }}>
+                  View in {viewingPost.room_emoji} {viewingPost.room} →
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

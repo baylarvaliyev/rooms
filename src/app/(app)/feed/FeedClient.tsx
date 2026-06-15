@@ -375,6 +375,7 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
       author: sharing.profiles?.name || 'Unknown',
       room: sharing.rooms?.name || null,
       room_emoji: sharing.rooms?.emoji || null,
+      room_id: sharing.room_id || null,
     }
     // Special prefix so MessagesClient knows to render as a post card
     const content = `__SHARED_POST__${shareMsg ? shareMsg + '|||' : ''}${JSON.stringify(postData)}`
