@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import PWAProvider from '@/components/PWAProvider'
+import ThemeProvider from '@/components/ThemeProvider'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 
@@ -79,8 +80,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" sizes="152x152" href="/icon-152.png" />
       </head>
       <body className={inter.className} style={{ background: 'var(--bg0)' }}>
-        {children}
-        <PWAProvider />
+        <ThemeProvider>
+          {children}
+          <PWAProvider />
+        </ThemeProvider>
         <Analytics />
         <SpeedInsights />
       </body>

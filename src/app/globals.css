@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  /* True black — Instagram-style */
+  /* True black — dark mode (default) */
   --bg0: #000000;
   --bg1: #000000;
   --bg2: #111111;
   --bg3: #1a1a1a;
   --bg4: #222222;
   --bg5: #2a2a2a;
-  --accent: #e1306c;        /* Instagram pink/red */
-  --accent2: #f77737;       /* Instagram orange */
+  --accent: #e1306c;
+  --accent2: #f77737;
   --accentbg: rgba(225,48,108,0.1);
   --accentbdr: rgba(225,48,108,0.28);
   --text1: #ffffff;
@@ -23,9 +23,28 @@
   --purple: #833ab4;
   --border: rgba(255,255,255,0.08);
   --border2: rgba(255,255,255,0.14);
-
-  /* Instagram gradient */
   --ig-gradient: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+  --topbar-bg: rgba(0,0,0,0.95);
+  --mobile-nav-bg: rgba(0,0,0,0.98);
+}
+
+/* LIGHT MODE */
+[data-theme="light"] {
+  --bg0: #fafafa;
+  --bg1: #f5f5f5;
+  --bg2: #ffffff;
+  --bg3: #f0f0f0;
+  --bg4: #e8e8e8;
+  --bg5: #d8d8d8;
+  --text1: #0a0a0a;
+  --text2: #444444;
+  --text3: #888888;
+  --border: rgba(0,0,0,0.10);
+  --border2: rgba(0,0,0,0.16);
+  --topbar-bg: rgba(250,250,250,0.95);
+  --mobile-nav-bg: rgba(250,250,250,0.98);
+  --accentbg: rgba(225,48,108,0.08);
+  --accentbdr: rgba(225,48,108,0.24);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -69,7 +88,7 @@ button:active, [role="button"]:active { transform: scale(0.94) !important; trans
 .app-shell { display: flex; height: 100dvh; overflow: hidden; background: var(--bg0); }
 .app-sidebar { width: 72px; background: var(--bg0); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 16px 0; gap: 4px; flex-shrink: 0; z-index: 50; }
 .app-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
-.app-topbar { height: 54px; flex-shrink: 0; background: rgba(0,0,0,.95); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 10px; z-index: 40; }
+.app-topbar { height: 54px; flex-shrink: 0; background: var(--topbar-bg); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 10px; z-index: 40; }
 .app-content { flex: 1; overflow: hidden; display: flex; }
 .app-mobile-nav { display: none; }
 
@@ -86,7 +105,7 @@ button:active, [role="button"]:active { transform: scale(0.94) !important; trans
     position: fixed;
     bottom: 0; left: 0; right: 0;
     height: 56px;
-    background: rgba(0,0,0,.98);
+    background: var(--mobile-nav-bg);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-top: 1px solid var(--border);

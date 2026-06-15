@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
+import { useTheme } from '@/components/ThemeProvider'
 
 const Icons = {
   home: (active: boolean) => (
@@ -72,6 +73,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const { theme, toggle: toggleTheme } = useTheme()
   const [profile, setProfile] = useState<any>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [notifCount, setNotifCount] = useState(0)
@@ -161,6 +163,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         })}
 
         <div style={{ flex: 1 }} />
+
+        {/* Theme toggle */}
+        <div onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light' : 'Switch to dark'} style={{ width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text3)', fontSize: '18px', transition: 'all .15s' }}
+          onMouseOver={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg2)'}
+          onMouseOut={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+        >
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </div>
 
         <div onClick={() => router.push('/profile')} style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', border: activeId === 'profile' ? '2px solid var(--text1)' : '1.5px solid var(--bg4)', transition: 'border .15s' }}>
           {profile?.avatar_url

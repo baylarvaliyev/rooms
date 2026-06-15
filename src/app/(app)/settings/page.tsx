@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { useTheme } from '@/components/ThemeProvider'
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(false)
@@ -10,6 +11,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [userEmail, setUserEmail] = useState('')
+  const { theme, toggle: toggleTheme } = useTheme()
   const [settings, setSettings] = useState({
     push_notifications: true,
     email_digest: false,
@@ -105,6 +107,31 @@ export default function SettingsPage() {
                   }}
                 >{resetSent ? '✓ Sent!' : 'Reset'}</button>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Appearance */}
+        <div style={{ marginBottom: '22px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '9px' }}>Appearance</div>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+            <div style={{ padding: '13px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: '13px', color: 'var(--text1)' }}>Theme</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '1px' }}>{theme === 'dark' ? '🌙 Dark mode' : '☀️ Light mode'}</div>
+              </div>
+              <button onClick={toggleTheme} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text1)', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '500' }}>
+                {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+              </button>
+            </div>
+            {/* Quick toggle row */}
+            <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px' }}>
+              {['dark', 'light'].map(t => (
+                <button key={t} onClick={() => t !== theme && toggleTheme()} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: `1px solid ${theme === t ? 'var(--accent)' : 'var(--border)'}`, background: theme === t ? 'rgba(225,48,108,.1)' : t === 'dark' ? '#111' : '#fff', color: theme === t ? 'var(--accent)' : t === 'dark' ? '#fff' : '#000', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  {t === 'dark' ? '🌙 Dark' : '☀️ Light'}
+                  {theme === t && <span style={{ fontSize: '10px' }}>✓</span>}
+                </button>
+              ))}
             </div>
           </div>
         </div>
