@@ -83,7 +83,7 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
       supabase.from('follows').select('following_id').eq('follower_id', user.id),
       supabase.from('likes').select('post_id').eq('user_id', user.id),
       supabase.from('saved_posts').select('post_id').eq('user_id', user.id),
-      supabase.from('room_members').select('rooms(id, name, emoji)').eq('user_id', user.id),
+      supabase.from('room_members').select('rooms(id, name, emoji, icon_url, cover_url)').eq('user_id', user.id),
     ])
 
     setProfile(profileData)
