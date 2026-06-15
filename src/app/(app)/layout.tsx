@@ -118,6 +118,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => { if (channel) supabase.removeChannel(channel) }
   }, [pathname])
 
+  useEffect(() => {
+    // Prefetch all main routes on mount for instant navigation
+    NAV.forEach(n => router.prefetch(n.path))
+    MOBILE_NAV.forEach(n => router.prefetch(n.path))
+    router.prefetch('/profile')
+  }, [])
+
   useEffect(() => { if (pathname === '/notifications') setNotifCount(0) }, [pathname])
   useEffect(() => { if (pathname.startsWith('/messages')) setDmCount(0) }, [pathname])
 

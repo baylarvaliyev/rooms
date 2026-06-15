@@ -54,6 +54,74 @@ function getLevel(rep: number) {
   return { level: 1, title: 'Newcomer', next: 20 }
 }
 
+const MEDALS = ['🥇', '🥈', '🥉']
+
+function LeaderboardTab({ profile, leaderboard, myRank, loading, onLoad, router, getColor }: any) {
+  useEffect(() => { onLoad() }, [])
+
+  if (loading) return (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
+      <div className="spinner" />
+    </div>
+  )
+
+  return (
+    <div>
+      {/* My rank banner */}
+      {myRank && (
+        <div style={{ background: 'linear-gradient(135deg, rgba(225,48,108,.08), rgba(131,58,180,.06))', border: '1px solid rgba(225,48,108,.2)', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '2px' }}>Your global rank</div>
+            <div style={{ fontWeight: '800', fontSize: '28px', color: 'var(--accent)' }}>#{myRank}</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '2px' }}>Reputation</div>
+            <div style={{ fontWeight: '700', fontSize: '20px', color: 'var(--text1)' }}>{(profile?.reputation || 0).toLocaleString()} pts</div>
+          </div>
+        </div>
+      )}
+
+      {/* Top 10 list */}
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '13px', overflow: 'hidden', marginBottom: '14px' }}>
+        {leaderboard.map((u: any, i: number) => {
+          const isMe = u.id === profile?.id
+          return (
+            <div key={u.id} onClick={() => router.push(`/users/${u.username}`)} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 14px', borderBottom: i < leaderboard.length - 1 ? '1px solid var(--border)' : 'none', background: isMe ? 'rgba(225,48,108,.06)' : 'none', cursor: 'pointer', transition: 'background .15s' }}
+              onMouseOver={e => (e.currentTarget as HTMLElement).style.background = isMe ? 'rgba(225,48,108,.1)' : 'var(--bg3)'}
+              onMouseOut={e => (e.currentTarget as HTMLElement).style.background = isMe ? 'rgba(225,48,108,.06)' : 'none'}
+            >
+              <div style={{ width: '26px', textAlign: 'center', fontWeight: '700', fontSize: i < 3 ? '16px' : '13px', color: i < 3 ? 'var(--yellow)' : 'var(--text3)', flexShrink: 0 }}>
+                {i < 3 ? MEDALS[i] : i + 1}
+              </div>
+              <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: u.avatar_url ? 'none' : getColor(u.name || 'U'), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: '#fff', overflow: 'hidden' }}>
+                {u.avatar_url ? <img src={u.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : (u.name || 'U').charAt(0).toUpperCase()}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '13px', fontWeight: isMe ? '700' : '500', color: 'var(--text1)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  {u.name}
+                  {isMe && <span style={{ fontSize: '9px', color: 'var(--accent)', background: 'rgba(225,48,108,.1)', padding: '1px 5px', borderRadius: '4px' }}>You</span>}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)' }}>@{u.username}</div>
+              </div>
+              <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text1)', flexShrink: 0 }}>
+                {(u.reputation || 0).toLocaleString()} <span style={{ fontSize: '10px', color: 'var(--text3)', fontWeight: '400' }}>pts</span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* View full leaderboard button */}
+      <button onClick={() => router.push('/leaderboard')} style={{ width: '100%', padding: '12px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text2)', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all .2s' }}
+        onMouseOver={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'}
+        onMouseOut={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
+      >
+        🏆 View Full Leaderboard →
+      </button>
+    </div>
+  )
+}
+
 export default function ProfileClient({ profile: initialProfile, posts: initialPosts, rooms: initialRooms, followersCount: initialFollowers, followingCount: initialFollowing, achievements: initialAchievements }: any) {
   const [profile, setProfile] = useState(initialProfile || null)
   const [posts, setPosts] = useState(initialPosts || [])
@@ -63,6 +131,11 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
   const [achievements, setAchievements] = useState(initialAchievements || [])
   const [dataLoading, setDataLoading] = useState(!initialProfile)
   const [tab, setTab] = useState<'posts' | 'rooms' | 'achievements' | 'leaderboard'>('posts')
+
+  function switchTab(t: 'posts' | 'rooms' | 'achievements' | 'leaderboard') {
+    setTab(t)
+    if (t === 'leaderboard') loadLeaderboard()
+  }
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(profile?.name || '')
   const [username, setUsername] = useState(profile?.username || '')
@@ -76,6 +149,9 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
   const [coverUrl, setCoverUrl] = useState(profile?.cover_url || '')
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
+  const [leaderboard, setLeaderboard] = useState<any[]>([])
+  const [myRank, setMyRank] = useState<number | null>(null)
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const avatarRef = useRef<HTMLInputElement>(null)
   const coverRef = useRef<HTMLInputElement>(null)
@@ -126,6 +202,27 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
     setFollowingCount(following || 0)
     setAchievements(achievementsData || [])
     setDataLoading(false)
+  }
+
+  async function loadLeaderboard() {
+    if (leaderboard.length > 0) return // already loaded
+    setLeaderboardLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: topUsers } = await supabase
+      .from('profiles')
+      .select('id, name, username, avatar_url, reputation')
+      .order('reputation', { ascending: false })
+      .limit(10)
+    setLeaderboard(topUsers || [])
+    // Find my rank
+    if (user && profile) {
+      const { count } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .gt('reputation', profile.reputation || 0)
+      setMyRank((count || 0) + 1)
+    }
+    setLeaderboardLoading(false)
   }
 
   const color = getColor(profile?.name || 'U')
@@ -343,7 +440,7 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
         {/* Tabs */}
         <div style={{ display: 'flex', gap: '2px', borderBottom: '1px solid var(--border)', marginBottom: '18px', overflowX: 'auto' }}>
           {(['posts', 'rooms', 'achievements', 'leaderboard'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{ padding: '9px 16px', border: 'none', background: 'none', color: tab === t ? 'var(--accent2)' : 'var(--text3)', borderBottom: `2px solid ${tab === t ? 'var(--accent)' : 'transparent'}`, fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '-1px', transition: 'all .18s', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+            <button key={t} onClick={() => switchTab(t)} style={{ padding: '9px 16px', border: 'none', background: 'none', color: tab === t ? 'var(--accent2)' : 'var(--text3)', borderBottom: `2px solid ${tab === t ? 'var(--accent)' : 'transparent'}`, fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '-1px', transition: 'all .18s', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
               {t === 'leaderboard' ? '🏆 Leaderboard' : t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
@@ -415,16 +512,17 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
             </div>
           </div>
         )}
-        {/* Leaderboard tab */}
+        {/* Leaderboard tab — embedded mini board */}
         {tab === 'leaderboard' && (
-          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏆</div>
-            <div style={{ fontWeight: '700', fontSize: '18px', marginBottom: '8px' }}>Global Leaderboard</div>
-            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '24px' }}>See where you rank against other members</div>
-            <button onClick={() => router.push('/leaderboard')} style={{ padding: '12px 28px', background: 'var(--ig-gradient)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
-              View Leaderboard →
-            </button>
-          </div>
+          <LeaderboardTab
+            profile={profile}
+            leaderboard={leaderboard}
+            myRank={myRank}
+            loading={leaderboardLoading}
+            onLoad={loadLeaderboard}
+            router={router}
+            getColor={getColor}
+          />
         )}
 
         {/* Settings + Sign out */}
