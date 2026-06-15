@@ -155,12 +155,13 @@ export default function VoiceRoom({ room, members, currentUser, isMember }: any)
       {callJoined && isMobile && dailyUrl && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <iframe
-            src={`${dailyUrl}?t=${dailyToken}`}
-            allow="camera; microphone; autoplay; display-capture; fullscreen"
-            style={{ flex: 1, border: 'none', width: '100%' }}
+            src={`${dailyUrl}?t=${dailyToken}&embed=true&showLeaveButton=false&showFullscreenButton=false`}
+            allow="camera; microphone; autoplay; display-capture; fullscreen; speaker-selection"
+            allowFullScreen
+            style={{ flex: 1, border: 'none', width: '100%', height: '100%' }}
           />
-          <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg1)', display: 'flex', gap: '10px', justifyContent: 'center' }}>
-            <button onClick={leaveCall} style={{ padding: '10px 24px', background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.3)', borderRadius: '24px', color: 'var(--red)', cursor: 'pointer', fontSize: '14px', fontWeight: '600', fontFamily: 'inherit' }}>
+          <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg1)', display: 'flex', gap: '10px', justifyContent: 'center', flexShrink: 0, paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+            <button onClick={leaveCall} style={{ padding: '10px 32px', background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.3)', borderRadius: '24px', color: 'var(--red)', cursor: 'pointer', fontSize: '14px', fontWeight: '600', fontFamily: 'inherit' }}>
               📴 Leave
             </button>
           </div>

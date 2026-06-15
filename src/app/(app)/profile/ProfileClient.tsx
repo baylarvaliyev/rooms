@@ -62,7 +62,7 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
   const [followingCount, setFollowingCount] = useState(initialFollowing || 0)
   const [achievements, setAchievements] = useState(initialAchievements || [])
   const [dataLoading, setDataLoading] = useState(!initialProfile)
-  const [tab, setTab] = useState<'posts' | 'rooms' | 'achievements'>('posts')
+  const [tab, setTab] = useState<'posts' | 'rooms' | 'achievements' | 'leaderboard'>('posts')
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(profile?.name || '')
   const [username, setUsername] = useState(profile?.username || '')
@@ -341,10 +341,10 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: '2px', borderBottom: '1px solid var(--border)', marginBottom: '18px' }}>
-          {(['posts', 'rooms', 'achievements'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{ padding: '9px 18px', border: 'none', background: 'none', color: tab === t ? 'var(--accent2)' : 'var(--text3)', borderBottom: `2px solid ${tab === t ? 'var(--accent)' : 'transparent'}`, fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '-1px', transition: 'all .18s', fontFamily: 'inherit' }}>
-              {t.charAt(0).toUpperCase() + t.slice(1)}
+        <div style={{ display: 'flex', gap: '2px', borderBottom: '1px solid var(--border)', marginBottom: '18px', overflowX: 'auto' }}>
+          {(['posts', 'rooms', 'achievements', 'leaderboard'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{ padding: '9px 16px', border: 'none', background: 'none', color: tab === t ? 'var(--accent2)' : 'var(--text3)', borderBottom: `2px solid ${tab === t ? 'var(--accent)' : 'transparent'}`, fontSize: '13px', fontWeight: '500', cursor: 'pointer', marginBottom: '-1px', transition: 'all .18s', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+              {t === 'leaderboard' ? '🏆 Leaderboard' : t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
         </div>
@@ -415,7 +415,19 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
             </div>
           </div>
         )}
-        {/* Settings + Sign out — mobile accessible */}
+        {/* Leaderboard tab */}
+        {tab === 'leaderboard' && (
+          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏆</div>
+            <div style={{ fontWeight: '700', fontSize: '18px', marginBottom: '8px' }}>Global Leaderboard</div>
+            <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '24px' }}>See where you rank against other members</div>
+            <button onClick={() => router.push('/leaderboard')} style={{ padding: '12px 28px', background: 'var(--ig-gradient)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
+              View Leaderboard →
+            </button>
+          </div>
+        )}
+
+        {/* Settings + Sign out */}
         <div style={{ display: 'flex', gap: '10px', marginTop: '8px', marginBottom: '32px' }}>
           <button onClick={() => router.push('/settings')} style={{ flex: 1, padding: '11px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text2)', fontSize: '13px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
