@@ -47,20 +47,28 @@ export default function LoginPage() {
   }
 
   async function handleGoogle() {
-    // Use the current origin — works on both localhost and Vercel
     const redirectTo = typeof window !== 'undefined'
-      ? `${window.location.origin}/auth/callback`
-      : 'https://rooms-rbp4.vercel.app/auth/callback'
+      ? `${window.location.origin}/auth/callback?next=/onboarding`
+      : 'https://rooms-rbp4.vercel.app/auth/callback?next=/onboarding'
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo }
     })
   }
 
+  // Issue 32: Forgot password flow
+  async function handleForgotPassword() {
+    if (!email) { alert('Enter your email address first'); return }
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`
+    })
+    alert(`✓ Password reset link sent to ${email}`)
+  }
+
   // Email confirmation screen
   if (emailSent) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', background: 'var(--bg0)' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', background: 'var(--bg0)', backgroundImage: 'radial-gradient(ellipse at 30% 40%, rgba(99,102,241,.12) 0%, transparent 60%), radial-gradient(ellipse at 70% 80%, rgba(225,48,108,.08) 0%, transparent 50%)' }}>
         <div className="fade-up" style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '24px', padding: '40px', width: '100%', maxWidth: '400px', textAlign: 'center' }}>
           <div style={{ fontSize: '56px', marginBottom: '16px' }}>📧</div>
           <div style={{ fontWeight: '800', fontSize: '22px', marginBottom: '8px' }}>Check your email</div>
@@ -186,16 +194,19 @@ export default function LoginPage() {
         </div>
 
         <div style={{ marginBottom: '20px' }}>
-          <label style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text2)', display: 'block', marginBottom: '5px' }}>Password</label>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+            <label style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text2)' }}>Password</label>
+            {mode === 'signin' && (
+              <button onClick={handleForgotPassword} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: 'var(--accent2)', padding: '0', fontFamily: 'inherit' }}>
+                Forgot password?
+              </button>
+            )}
+          </div>
           <input
             type="password" value={password} onChange={e => setPassword(e.target.value)}
             placeholder="••••••••"
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-            style={{
-              width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)',
-              borderRadius: '9px', padding: '9px 13px', color: 'var(--text1)',
-              fontSize: '13px', outline: 'none'
-            }}
+            style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '9px', padding: '9px 13px', color: 'var(--text1)', fontSize: '13px', outline: 'none' }}
           />
         </div>
 

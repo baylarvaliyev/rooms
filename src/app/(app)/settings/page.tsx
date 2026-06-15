@@ -11,6 +11,9 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [userEmail, setUserEmail] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
   const { theme, toggle: toggleTheme } = useTheme()
   const [settings, setSettings] = useState({
     push_notifications: true,
@@ -27,14 +30,8 @@ export default function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       setUserEmail(user.email || '')
-      const { data } = await supabase
-        .from('profiles')
-        .select('settings')
-        .eq('id', user.id)
-        .single()
-      if (data?.settings) {
-        setSettings(prev => ({ ...prev, ...data.settings }))
-      }
+      const { data } = await supabase.from('profiles').select('settings').eq('id', user.id).single()
+      if (data?.settings) setSettings(prev => ({ ...prev, ...data.settings }))
     }
     load()
   }, [])
@@ -42,19 +39,14 @@ export default function SettingsPage() {
   async function saveSettings() {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      await supabase.from('profiles').update({ settings }).eq('id', user.id)
-    }
-    setSaving(false)
-    setSaved(true)
+    if (user) await supabase.from('profiles').update({ settings }).eq('id', user.id)
+    setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 3000)
   }
 
   async function sendPasswordReset() {
     if (!userEmail) return
-    await supabase.auth.resetPasswordForEmail(userEmail, {
-      redirectTo: `${window.location.origin}/reset-password`
-    })
+    await supabase.auth.resetPasswordForEmail(userEmail, { redirectTo: `${window.location.origin}/reset-password` })
     setResetSent(true)
   }
 
@@ -62,6 +54,52 @@ export default function SettingsPage() {
     setLoading(true)
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  // Issue 33: Delete account
+  async function deleteAccount() {
+    if (deleteConfirmText !== 'DELETE') return
+    setDeleting(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    // Delete all user data
+    await Promise.all([
+      supabase.from('posts').delete().eq('user_id', user.id),
+      supabase.from('messages').delete().eq('user_id', user.id),
+      supabase.from('direct_messages').delete().eq('from_user', user.id),
+      supabase.from('follows').delete().eq('follower_id', user.id),
+      supabase.from('room_members').delete().eq('user_id', user.id),
+      supabase.from('likes').delete().eq('user_id', user.id),
+      supabase.from('saved_posts').delete().eq('user_id', user.id),
+    ])
+    await supabase.from('profiles').delete().eq('id', user.id)
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
+  // Issue 26: Single push notification enable — remove duplicate toggle
+  async function enablePushNotifications() {
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission === 'granted') {
+        const reg = await navigator.serviceWorker.ready
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+        })
+        await fetch('/api/push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'subscribe', subscription: sub.toJSON() })
+        })
+        toggle('push_notifications')
+        alert('🔔 Push notifications enabled!')
+      } else {
+        alert('Notification permission denied. Please enable in your browser settings.')
+      }
+    } catch (e) {
+      alert('Push notifications not supported in this browser.')
+    }
   }
 
   function toggle(key: string) {
@@ -77,9 +115,7 @@ export default function SettingsPage() {
         <div style={{ marginBottom: '22px' }}>
           <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '9px' }}>Account</div>
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
-            <div
-              onClick={() => router.push('/profile')}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background .18s' }}
+            <div onClick={() => router.push('/profile')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
               onMouseOver={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
               onMouseOut={e => (e.currentTarget as HTMLElement).style.background = 'none'}
             >
@@ -93,19 +129,16 @@ export default function SettingsPage() {
               <div style={{ fontSize: '13px', color: 'var(--text1)', marginBottom: '2px' }}>Email</div>
               <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{userEmail || 'Loading…'}</div>
             </div>
+            {/* Issue 32: Forgot password */}
             <div style={{ padding: '14px 16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
                   <div style={{ fontSize: '13px', color: 'var(--text1)' }}>Password</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '1px' }}>Send reset link to your email</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '1px' }}>Send a reset link to your email</div>
                 </div>
-                <button
-                  onClick={sendPasswordReset}
-                  style={{
-                    padding: '6px 13px', background: 'var(--bg3)', border: '1px solid var(--border)',
-                    borderRadius: '8px', color: 'var(--text2)', fontSize: '12px', cursor: 'pointer'
-                  }}
-                >{resetSent ? '✓ Sent!' : 'Reset'}</button>
+                <button onClick={sendPasswordReset} style={{ padding: '6px 13px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text2)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {resetSent ? '✓ Sent!' : 'Reset password'}
+                </button>
               </div>
             </div>
           </div>
@@ -115,40 +148,37 @@ export default function SettingsPage() {
         <div style={{ marginBottom: '22px' }}>
           <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '9px' }}>Appearance</div>
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
-            <div style={{ padding: '13px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontSize: '13px', color: 'var(--text1)' }}>Theme</div>
-                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '1px' }}>{theme === 'dark' ? '🌙 Dark mode' : '☀️ Light mode'}</div>
-              </div>
-              <button onClick={toggleTheme} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text1)', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '500' }}>
-                {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
-              </button>
-            </div>
-            {/* Quick toggle row */}
-            <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px' }}>
+            <div style={{ padding: '12px 16px', display: 'flex', gap: '8px' }}>
               {['dark', 'light'].map(t => (
                 <button key={t} onClick={() => t !== theme && toggleTheme()} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: `1px solid ${theme === t ? 'var(--accent)' : 'var(--border)'}`, background: theme === t ? 'rgba(225,48,108,.1)' : t === 'dark' ? '#111' : '#fff', color: theme === t ? 'var(--accent)' : t === 'dark' ? '#fff' : '#000', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                  {t === 'dark' ? '🌙 Dark' : '☀️ Light'}
-                  {theme === t && <span style={{ fontSize: '10px' }}>✓</span>}
+                  {t === 'dark' ? '🌙 Dark' : '☀️ Light'} {theme === t && <span style={{ fontSize: '10px' }}>✓</span>}
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Notifications */}
+        {/* Issue 26: Notifications — single clear section, no duplicate button */}
         <div style={{ marginBottom: '22px' }}>
           <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '9px' }}>Notifications</div>
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', borderBottom: '1px solid var(--border)' }}>
+              <div>
+                <div style={{ fontSize: '13px', color: 'var(--text1)' }}>Push notifications</div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '1px' }}>
+                  {settings.push_notifications ? 'Enabled — real-time alerts in browser' : 'Tap to enable browser alerts'}
+                </div>
+              </div>
+              {settings.push_notifications
+                ? <ToggleSwitch on={true} onToggle={() => toggle('push_notifications')} />
+                : <button onClick={enablePushNotifications} style={{ padding: '6px 12px', background: 'rgba(225,48,108,.1)', border: '1px solid rgba(225,48,108,.2)', borderRadius: '8px', color: 'var(--accent)', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>Enable</button>
+              }
+            </div>
             {[
-              { key: 'push_notifications', label: 'Push notifications', sub: 'Real-time alerts in browser' },
               { key: 'email_digest', label: 'Email digest', sub: 'Weekly summary of activity' },
               { key: 'mentions', label: 'Mentions', sub: 'When someone tags you' },
-            ].map((item, i, arr) => (
-              <div key={item.key} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '13px 16px', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none'
-              }}>
+            ].map((item, i) => (
+              <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', borderBottom: i === 0 ? '1px solid var(--border)' : 'none' }}>
                 <div>
                   <div style={{ fontSize: '13px', color: 'var(--text1)' }}>{item.label}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '1px' }}>{item.sub}</div>
@@ -156,29 +186,6 @@ export default function SettingsPage() {
                 <ToggleSwitch on={(settings as any)[item.key]} onToggle={() => toggle(item.key)} />
               </div>
             ))}
-            {/* Enable push notifications button */}
-            <div style={{ padding: '13px 16px', borderTop: '1px solid var(--border)' }}>
-              <button onClick={async () => {
-                const permission = await Notification.requestPermission()
-                if (permission === 'granted') {
-                  const reg = await navigator.serviceWorker.ready
-                  const sub = await reg.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-                  })
-                  await fetch('/api/push', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'subscribe', subscription: sub.toJSON() })
-                  })
-                  alert('🔔 Push notifications enabled!')
-                } else {
-                  alert('Notification permission denied. Please enable in browser settings.')
-                }
-              }} style={{ width: '100%', padding: '9px', background: 'rgba(225,48,108,.08)', border: '1px solid rgba(225,48,108,.2)', borderRadius: '9px', color: 'var(--accent)', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
-                🔔 Enable Push Notifications
-              </button>
-            </div>
           </div>
         </div>
 
@@ -188,12 +195,9 @@ export default function SettingsPage() {
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
             {[
               { key: 'public_profile', label: 'Public profile', sub: 'Anyone can view your profile' },
-              { key: 'show_online', label: 'Show online status', sub: 'Let others see when you\'re active' },
+              { key: 'show_online', label: 'Show online status', sub: "Let others see when you're active" },
             ].map((item, i, arr) => (
-              <div key={item.key} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '13px 16px', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none'
-              }}>
+              <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
                 <div>
                   <div style={{ fontSize: '13px', color: 'var(--text1)' }}>{item.label}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '1px' }}>{item.sub}</div>
@@ -204,37 +208,49 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Save button */}
-        <button onClick={saveSettings} disabled={saving} style={{
-          width: '100%', padding: '12px', background: 'var(--accent)',
-          border: 'none', borderRadius: '10px', color: '#fff', fontSize: '13px',
-          fontWeight: '600', cursor: 'pointer', marginBottom: '12px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-          opacity: saving ? .7 : 1
-        }}>
+        {/* Save */}
+        <button onClick={saveSettings} disabled={saving} style={{ width: '100%', padding: '12px', background: 'var(--accent)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: saving ? .7 : 1 }}>
           {saving ? <><div className="spinner" />Saving…</> : saved ? '✓ Saved!' : 'Save settings'}
         </button>
 
-        {/* Sign out */}
+        {/* Session */}
         <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '9px' }}>Session</div>
-        <button onClick={signOut} disabled={loading} style={{
-          width: '100%', padding: '12px', background: 'rgba(239,68,68,.1)',
-          border: '1px solid rgba(239,68,68,.2)', borderRadius: '10px',
-          color: 'var(--red)', fontSize: '13px', fontWeight: '600',
-          cursor: 'pointer', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', gap: '8px'
-        }}>
+        <button onClick={signOut} disabled={loading} style={{ width: '100%', padding: '12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '10px', color: 'var(--red)', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '20px' }}>
           {loading ? <><div className="spinner" />Signing out…</> : '↩ Sign out'}
         </button>
 
+        {/* Issue 33: Delete account */}
+        <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '9px' }}>Danger Zone</div>
+        <div style={{ background: 'rgba(239,68,68,.04)', border: '1px solid rgba(239,68,68,.15)', borderRadius: '12px', padding: '16px', marginBottom: '24px' }}>
+          <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--red)', marginBottom: '6px' }}>Delete Account</div>
+          <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '14px', lineHeight: '1.6' }}>
+            Permanently delete your account and all your data including posts, messages, rooms, and profile. This cannot be undone.
+          </div>
+          {!showDeleteConfirm ? (
+            <button onClick={() => setShowDeleteConfirm(true)} style={{ padding: '9px 18px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: '8px', color: 'var(--red)', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
+              Delete my account
+            </button>
+          ) : (
+            <div>
+              <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '10px' }}>Type <strong>DELETE</strong> to confirm:</div>
+              <input value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)} placeholder="Type DELETE" style={{ width: '100%', background: 'var(--bg3)', border: `1px solid ${deleteConfirmText === 'DELETE' ? 'var(--red)' : 'var(--border)'}`, borderRadius: '8px', padding: '9px 13px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit', marginBottom: '10px' }} />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText('') }} style={{ flex: 1, padding: '9px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text2)', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+                <button onClick={deleteAccount} disabled={deleteConfirmText !== 'DELETE' || deleting} style={{ flex: 1, padding: '9px', background: 'var(--red)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: deleteConfirmText !== 'DELETE' ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: deleteConfirmText !== 'DELETE' || deleting ? .5 : 1 }}>
+                  {deleting ? 'Deleting…' : 'Delete forever'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Legal */}
-        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginTop: '24px' }}>
+        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginBottom: '8px' }}>
           <a href="/terms" style={{ fontSize: '12px', color: 'var(--text3)', textDecoration: 'none' }}>Terms of Service</a>
           <span style={{ color: 'var(--text3)', fontSize: '12px' }}>·</span>
           <a href="/privacy" style={{ fontSize: '12px', color: 'var(--text3)', textDecoration: 'none' }}>Privacy Policy</a>
         </div>
-
-        <div style={{ textAlign: 'center', marginTop: '12px' }}>
+        <div style={{ textAlign: 'center', paddingBottom: '24px' }}>
           <span style={{ fontSize: '11px', color: 'var(--text3)' }}>Rooms v1.0 · Built with ❤️</span>
         </div>
       </div>
@@ -244,17 +260,8 @@ export default function SettingsPage() {
 
 function ToggleSwitch({ on, onToggle }: { on: boolean, onToggle: () => void }) {
   return (
-    <div onClick={onToggle} style={{
-      width: '38px', height: '21px', borderRadius: '11px',
-      background: on ? 'var(--accent)' : 'var(--bg5, #242a38)',
-      position: 'relative', cursor: 'pointer', transition: 'background .2s',
-      flexShrink: 0, border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`
-    }}>
-      <div style={{
-        position: 'absolute', top: '2px', left: on ? '18px' : '2px',
-        width: '15px', height: '15px', borderRadius: '50%',
-        background: '#fff', transition: 'left .2s', boxShadow: '0 1px 4px rgba(0,0,0,.3)'
-      }} />
+    <div onClick={onToggle} style={{ width: '38px', height: '21px', borderRadius: '11px', background: on ? 'var(--accent)' : 'var(--bg5, #242a38)', position: 'relative', cursor: 'pointer', transition: 'background .2s', flexShrink: 0, border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}` }}>
+      <div style={{ position: 'absolute', top: '2px', left: on ? '18px' : '2px', width: '15px', height: '15px', borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 4px rgba(0,0,0,.3)' }} />
     </div>
   )
 }

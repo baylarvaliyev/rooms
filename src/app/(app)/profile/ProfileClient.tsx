@@ -31,16 +31,34 @@ const ROOM_COLORS: Record<string, string> = {
   Lifestyle: 'linear-gradient(135deg,#0a0a2a,#1a1a4e)',
 }
 
+// Issue 13: Unified level system matching LeaderboardClient (20 levels)
 function getLevel(rep: number) {
-  if (rep >= 5000) return { level: 10, title: 'Legend', next: null }
-  if (rep >= 2000) return { level: 8, title: 'Expert', next: 5000 }
-  if (rep >= 1000) return { level: 7, title: 'Elite', next: 2000 }
-  if (rep >= 500)  return { level: 6, title: 'Pro', next: 1000 }
-  if (rep >= 200)  return { level: 5, title: 'Active', next: 500 }
-  if (rep >= 100)  return { level: 4, title: 'Rising Star', next: 200 }
-  if (rep >= 50)   return { level: 3, title: 'Contributor', next: 100 }
-  if (rep >= 20)   return { level: 2, title: 'Member', next: 50 }
-  return { level: 1, title: 'Newcomer', next: 20 }
+  const levels = [
+    { level: 1,  title: 'Newcomer',     min: 0,      next: 50 },
+    { level: 2,  title: 'Curious',      min: 50,     next: 150 },
+    { level: 3,  title: 'Regular',      min: 150,    next: 300 },
+    { level: 4,  title: 'Active',       min: 300,    next: 500 },
+    { level: 5,  title: 'Contributor',  min: 500,    next: 800 },
+    { level: 6,  title: 'Rising Star',  min: 800,    next: 1200 },
+    { level: 7,  title: 'Influencer',   min: 1200,   next: 1800 },
+    { level: 8,  title: 'Pro',          min: 1800,   next: 2500 },
+    { level: 9,  title: 'Expert',       min: 2500,   next: 3500 },
+    { level: 10, title: 'Elite',        min: 3500,   next: 5000 },
+    { level: 11, title: 'Champion',     min: 5000,   next: 7000 },
+    { level: 12, title: 'Master',       min: 7000,   next: 10000 },
+    { level: 13, title: 'Grand Master', min: 10000,  next: 15000 },
+    { level: 14, title: 'Legend',       min: 15000,  next: 25000 },
+    { level: 15, title: 'Mythic',       min: 25000,  next: 40000 },
+    { level: 16, title: 'Godlike',      min: 40000,  next: 60000 },
+    { level: 17, title: 'Transcendent', min: 60000,  next: 100000 },
+    { level: 18, title: 'Cosmic',       min: 100000, next: 200000 },
+    { level: 19, title: 'Eternal',      min: 200000, next: 500000 },
+    { level: 20, title: 'Immortal',     min: 500000, next: null },
+  ]
+  for (let i = levels.length - 1; i >= 0; i--) {
+    if (rep >= levels[i].min) return levels[i]
+  }
+  return levels[0]
 }
 
 const MEDALS = ['🥇', '🥈', '🥉']

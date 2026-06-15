@@ -41,10 +41,26 @@ export default function UserProfileClient({ profile, posts, followersCount, foll
     setLoading(false)
   }
 
+  const [blocking, setBlocking] = useState(false)
+  const [isBlocked, setIsBlocked] = useState(false)
+
+  // Issue 35: Block user
+  async function toggleBlock() {
+    setBlocking(true)
+    if (isBlocked) {
+      await supabase.from('user_blocks').delete().eq('blocker_id', currentUserId).eq('blocked_id', profile.id)
+      setIsBlocked(false)
+    } else {
+      if (!confirm(`Block @${profile.username}? They won't be able to DM you and you won't see their posts.`)) { setBlocking(false); return }
+      await supabase.from('user_blocks').insert({ blocker_id: currentUserId, blocked_id: profile.id })
+      setIsBlocked(true)
+    }
+    setBlocking(false)
+  }
+
   // Message button — opens DM with this user directly
   async function openMessage() {
     setMessageSending(true)
-    // Navigate to messages and open conversation with this user
     router.push(`/messages?user=${profile.id}&name=${encodeURIComponent(profile.name)}&username=${encodeURIComponent(profile.username)}`)
     setMessageSending(false)
   }
@@ -111,6 +127,10 @@ export default function UserProfileClient({ profile, posts, followersCount, foll
                     </button>
                     <button onClick={openMessage} disabled={messageSending} style={{ padding: '8px 20px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '9px', color: 'var(--text2)', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
                       💬 Message
+                    </button>
+                    {/* Issue 35: Block user */}
+                    <button onClick={toggleBlock} disabled={blocking} style={{ padding: '6px 14px', background: isBlocked ? 'rgba(239,68,68,.08)' : 'transparent', border: `1px solid ${isBlocked ? 'rgba(239,68,68,.2)' : 'var(--border)'}`, borderRadius: '9px', color: isBlocked ? 'var(--red)' : 'var(--text3)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                      {blocking ? '…' : isBlocked ? '🚫 Blocked' : 'Block'}
                     </button>
                   </>
                 ) : (

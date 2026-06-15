@@ -348,6 +348,13 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
     setIsFollowing(!isFollowing)
   }
 
+  // Issues 30+31: Leave room
+  async function leaveRoom() {
+    if (!confirm('Leave this room? You can rejoin later.')) return
+    await supabase.from('room_members').delete().eq('room_id', room.id).eq('user_id', currentUser.id)
+    router.push('/feed')
+  }
+
   async function generateInvite() {
     setGeneratingInvite(true)
     const { data: existing } = await supabase.from('room_invites').select('code').eq('room_id', room.id).eq('created_by', currentUser.id).single()
@@ -728,7 +735,14 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(8px)', zIndex: 900, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }} onClick={e => e.target === e.currentTarget && setShowSettings(false)}>
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '16px', width: '100%', maxWidth: '500px', overflow: 'hidden', marginTop: '16px' }} className="fade-up">
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', overflowX: 'auto' }}>
-              {([['general','⚙️ General'], ['schedule','📅 Events'], ['members','👥 Members'], ['invite','🔗 Invite'], ...(isOwner ? [['analytics','📊 Analytics']] : [])] as [string,string][]).map(([id, label]) => (
+              {/* Issue 11: Only show Invite tab for owners. Analytics only for owners */}
+              {([
+                ['general','⚙️ General'],
+                ['schedule','📅 Events'],
+                ['members','👥 Members'],
+                ...(isOwner ? [['invite','🔗 Invite']] : []),
+                ...(isOwner ? [['analytics','📊 Analytics']] : []),
+              ] as [string,string][]).map(([id, label]) => (
                 <button key={id} onClick={() => setSettingsTab(id as any)} style={{ padding: '11px 12px', background: 'none', border: 'none', color: settingsTab === id ? 'var(--text1)' : 'var(--text3)', borderBottom: `2px solid ${settingsTab === id ? 'var(--accent)' : 'transparent'}`, fontSize: '12px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>{label}</button>
               ))}
               <button onClick={() => setShowSettings(false)} style={{ marginLeft: 'auto', padding: '11px 14px', background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '18px' }}>×</button>
@@ -788,8 +802,17 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
                           <button onClick={() => pinMessage(pinInput || pinnedMsg?.content || '')} style={{ padding: '7px 13px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', cursor: 'pointer' }}>Pin</button>
                         </div>
                       </div>
-                      <button onClick={saveRoomSettings} style={{ width: '100%', padding: '11px', background: 'var(--ig-gradient)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>Save Changes</button>
+                      <button onClick={saveRoomSettings} style={{ width: '100%', padding: '11px', background: 'var(--ig-gradient)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit', marginBottom: '12px' }}>Save Changes</button>
+                      {/* Issue 30/31: Leave room — owner can't leave (they'd need to transfer ownership) */}
                     </>
+                  )}
+                  {/* Issue 30/31: Leave room button for non-owners */}
+                  {joined && !isOwner && (
+                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+                      <button onClick={leaveRoom} style={{ width: '100%', padding: '11px', background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.15)', borderRadius: '10px', color: 'var(--red)', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
+                        🚪 Leave Room
+                      </button>
+                    </div>
                   )}
                 </div>
               )}

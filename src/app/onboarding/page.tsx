@@ -184,7 +184,7 @@ export default function OnboardingPage() {
             <div style={{ textAlign: 'center', marginBottom: '20px' }}>
               <div style={{ fontSize: '36px', marginBottom: '8px' }}>🏠</div>
               <div style={{ fontWeight: '700', fontSize: '20px', marginBottom: '4px' }}>Join your first rooms</div>
-              <div style={{ fontSize: '13px', color: 'var(--text3)' }}>Select at least 3 to get a personalised feed from day one</div>
+              <div style={{ fontSize: '13px', color: 'var(--text3)' }}>Join at least 1 room — or skip and explore later</div>
             </div>
 
             {suggestedRooms.length === 0 ? (
@@ -212,23 +212,23 @@ export default function OnboardingPage() {
             )}
 
             <div style={{ fontSize: '12px', color: 'var(--text3)', textAlign: 'center', marginBottom: '16px' }}>
-              {followedRooms.size} selected {followedRooms.size < 3 && suggestedRooms.length > 0 && `· join ${3 - followedRooms.size} more`}
+              {followedRooms.size} room{followedRooms.size !== 1 ? 's' : ''} selected
             </div>
 
             {error && <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '8px', padding: '9px 13px', fontSize: '13px', color: 'var(--red)', marginBottom: '14px' }}>{error}</div>}
 
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={() => setStep(2)} style={{ flex: 1, padding: '11px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '10px', fontSize: '14px', color: 'var(--text2)', cursor: 'pointer', fontFamily: 'inherit' }}>Back</button>
-              <button onClick={finish} disabled={loading} style={{ flex: 2, padding: '11px', background: 'var(--ig-gradient)', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontFamily: 'inherit' }}>
+              {/* Issue 9: min 1 room required, but skip always available */}
+              <button onClick={finish} disabled={loading || followedRooms.size < 1} style={{ flex: 2, padding: '11px', background: 'var(--ig-gradient)', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', color: '#fff', cursor: followedRooms.size < 1 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontFamily: 'inherit', opacity: followedRooms.size < 1 ? .5 : 1 }}>
                 {loading ? <><div className="spinner" />Setting up…</> : `Let's go 🚀`}
               </button>
             </div>
 
-            {followedRooms.size < 3 && (
-              <button onClick={finish} disabled={loading} style={{ width: '100%', marginTop: '8px', padding: '8px', background: 'none', border: 'none', color: 'var(--text3)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>
-                Skip for now
-              </button>
-            )}
+            {/* Skip always visible */}
+            <button onClick={finish} disabled={loading} style={{ width: '100%', marginTop: '8px', padding: '8px', background: 'none', border: 'none', color: 'var(--text3)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+              Skip for now — I'll explore rooms myself
+            </button>
           </>
         )}
       </div>

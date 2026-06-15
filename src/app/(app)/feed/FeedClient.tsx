@@ -15,7 +15,11 @@ function timeAgo(date: string) {
   if (s < 60) return `${s}s ago`
   if (s < 3600) return `${Math.floor(s/60)}m ago`
   if (s < 86400) return `${Math.floor(s/3600)}h ago`
-  return `${Math.floor(s/86400)}d ago`
+  // Issue 18: Show absolute date for posts older than 3 days
+  const d = new Date(date)
+  const now = new Date()
+  if (s < 86400 * 7) return `${Math.floor(s/86400)}d ago`
+  return d.toLocaleDateString('en', { month: 'short', day: 'numeric' })
 }
 
 export default function FeedClient({ posts: initialPosts, likedIds: initialLikedIds, savedIds: initialSavedIds, profile: initialProfile, rooms: initialRooms, currentUserId: initialUserId, isNewUser: initialIsNewUser, suggestedRooms: initialSuggestedRooms }: any) {
@@ -45,6 +49,11 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
   const [pollVotes, setPollVotes] = useState<Record<string, number>>({})
   const [reporting, setReporting] = useState<string | null>(null)
   const [reportReason, setReportReason] = useState('')
+  // Issue 1: Post actions menu — separate delete/edit/report
+  const [postMenu, setPostMenu] = useState<string | null>(null)
+  // Issue 29: Edit post
+  const [editingPost, setEditingPost] = useState<string | null>(null)
+  const [editContent, setEditContent] = useState('')
   const [sharing, setSharing] = useState<any>(null)
   const [shareTarget, setShareTarget] = useState<'dm' | 'room'>('dm')
   const [shareSearch, setShareSearch] = useState('')
@@ -262,6 +271,16 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
     if (!confirm('Delete this post? This cannot be undone.')) return
     await supabase.from('posts').delete().eq('id', postId).eq('user_id', currentUserId)
     setPosts((prev: any[]) => prev.filter((p: any) => p.id !== postId))
+    setPostMenu(null)
+  }
+
+  // Issue 29: Edit post
+  async function saveEditPost(postId: string) {
+    if (!editContent.trim()) return
+    await supabase.from('posts').update({ content: editContent.trim() }).eq('id', postId).eq('user_id', currentUserId)
+    setPosts((prev: any[]) => prev.map(p => p.id === postId ? { ...p, content: editContent.trim() } : p))
+    setEditingPost(null)
+    setEditContent('')
   }
 
   async function submitReport(postId: string) {
@@ -288,7 +307,9 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
   }
 
   async function createPost() {
-    if (!postForm.content.trim() || !postForm.room_id) return
+    // Issue 2: Poll content is optional — only question and options are required
+    if (postType !== 'poll' && !postForm.content.trim()) return
+    if (!postForm.room_id) return
     setPosting(true)
 
     if (postType === 'poll') {
@@ -352,12 +373,22 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
     setShareSearch('')
     setShareSuccess(false)
     setShareTarget('dm')
-    // Load users + rooms for sharing
-    const [{ data: users }, { data: shareableRooms }] = await Promise.all([
-      supabase.from('profiles').select('id, name, username, avatar_url').neq('id', currentUserId).limit(20),
+    // Issue 19: Prioritize people you follow and recent DM partners
+    const [{ data: followedUsers }, { data: recentDMs }, { data: shareableRooms }] = await Promise.all([
+      supabase.from('follows').select('profiles!following_id(id, name, username, avatar_url)').eq('follower_id', currentUserId).limit(15),
+      supabase.from('direct_messages').select('to_user, from_user').or(`from_user.eq.${currentUserId},to_user.eq.${currentUserId}`).order('created_at', { ascending: false }).limit(30),
       supabase.from('room_members').select('rooms(id, name, emoji)').eq('user_id', currentUserId).limit(20),
     ])
-    setShareUsers(users || [])
+    // Build prioritized user list: recent DM partners first, then followed
+    const dmPartnerIds = new Set<string>()
+    ;(recentDMs || []).forEach((m: any) => {
+      const partnerId = m.from_user === currentUserId ? m.to_user : m.from_user
+      if (partnerId !== currentUserId) dmPartnerIds.add(partnerId)
+    })
+    const followedProfiles = (followedUsers || []).map((f: any) => f.profiles).filter(Boolean)
+    const dmFirst = followedProfiles.filter((u: any) => dmPartnerIds.has(u.id))
+    const rest = followedProfiles.filter((u: any) => !dmPartnerIds.has(u.id))
+    setShareUsers([...dmFirst, ...rest].slice(0, 20))
     setShareRooms((shareableRooms || []).map((r: any) => r.rooms).filter(Boolean))
   }
 
@@ -552,10 +583,28 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{timeAgo(post.created_at)}</div>
                 </div>
-                <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '20px', padding: '4px', lineHeight: 1 }}
-                  onClick={() => post.user_id === currentUserId ? deletePost(post.id) : (setReporting(post.id), setReportReason(''))}>
-                  ···
-                </button>
+                {/* Issue 1 & 37: Proper SVG ··· menu button, not unicode dots */}
+                <div style={{ position: 'relative' }}>
+                  <button onClick={e => { e.stopPropagation(); setPostMenu(postMenu === post.id ? null : post.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: '6px', display: 'flex', alignItems: 'center', borderRadius: '6px' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+                    </svg>
+                  </button>
+                  {postMenu === post.id && (
+                    <div style={{ position: 'absolute', top: '100%', right: 0, background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '12px', padding: '6px', zIndex: 200, minWidth: '160px', boxShadow: '0 8px 24px rgba(0,0,0,.4)', whiteSpace: 'nowrap' }}>
+                      {post.user_id === currentUserId ? (
+                        <>
+                          <button onClick={() => { setEditingPost(post.id); setEditContent(post.content); setPostMenu(null) }} style={{ width: '100%', padding: '9px 12px', background: 'none', border: 'none', color: 'var(--text1)', fontSize: '13px', cursor: 'pointer', textAlign: 'left', borderRadius: '7px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '8px' }}>✏️ Edit post</button>
+                          <button onClick={() => deletePost(post.id)} style={{ width: '100%', padding: '9px 12px', background: 'none', border: 'none', color: 'var(--red)', fontSize: '13px', cursor: 'pointer', textAlign: 'left', borderRadius: '7px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '8px' }}>🗑 Delete post</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => { setReporting(post.id); setReportReason(''); setPostMenu(null) }} style={{ width: '100%', padding: '9px 12px', background: 'none', border: 'none', color: 'var(--text1)', fontSize: '13px', cursor: 'pointer', textAlign: 'left', borderRadius: '7px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '8px' }}>🚩 Report post</button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Image — full width */}
@@ -563,8 +612,16 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
                 <img src={post.media_url} alt="" style={{ width: '100%', display: 'block', maxHeight: '600px', objectFit: 'cover' }} />
               )}
 
-              {/* Text content */}
-              {post.content && (
+              {/* Issue 29: Inline edit mode */}
+              {editingPost === post.id ? (
+                <div style={{ padding: '0 14px 10px' }}>
+                  <textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={3} autoFocus style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--accent)', borderRadius: '10px', padding: '10px 12px', color: 'var(--text1)', fontSize: '14px', outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: '1.6', marginBottom: '8px' }} />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => { setEditingPost(null); setEditContent('') }} style={{ flex: 1, padding: '8px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text2)', cursor: 'pointer', fontSize: '13px', fontFamily: 'inherit' }}>Cancel</button>
+                    <button onClick={() => saveEditPost(post.id)} style={{ flex: 2, padding: '8px', background: 'var(--accent)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: 'inherit' }}>Save</button>
+                  </div>
+                </div>
+              ) : post.content && (
                 <div style={{ padding: post.media_url ? '10px 14px 4px' : '4px 14px 10px', fontSize: '14px', color: 'var(--text1)', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
                   <span style={{ fontWeight: '600', marginRight: '6px' }}>{posterName}</span>
                   {post.content}
@@ -578,8 +635,8 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
                 </div>
               )}
 
-              {/* Room context card — shows when post came from a followed room */}
-              {post.rooms && post._source === 'room' && (
+              {/* Issue 4: Room context card on ALL posts that have a room (not just _source=room) */}
+              {post.rooms && (
                 <div onClick={() => router.push(`/rooms/${post.room_id}`)} style={{ margin: '0 14px 8px', padding: '10px 12px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', transition: 'background .18s' }}
                   onMouseOver={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
                   onMouseOut={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg2)'}
@@ -587,7 +644,7 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
                   <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: 'var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{post.rooms.emoji}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text1)' }}>{post.rooms.name}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{post.comment_count > 0 ? `💬 ${post.comment_count} replies` : 'Room discussion'}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{post.comment_count > 0 ? `💬 ${post.comment_count} replies` : 'View room'}</div>
                   </div>
                   <div style={{ padding: '5px 12px', background: 'var(--accent)', borderRadius: '8px', color: '#fff', fontSize: '11px', fontWeight: '600', flexShrink: 0 }}>Enter →</div>
                 </div>
@@ -639,7 +696,7 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
 
               {/* Comments section */}
               {showComments && (
-                <div style={{ padding: '0 14px 8px' }}>
+                <div style={{ padding: '0 14px 8px' }} id={`comments-${post.id}`}>
                   {(comments[post.id] || []).map((c: any) => (
                     <div key={c.id} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                       <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: getColor(c.profiles?.name || 'U'), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: '#fff' }}>
@@ -652,15 +709,14 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
                     </div>
                   ))}
 
-                  {/* Comment input */}
+                  {/* Issue 17: Comment submit button always visible on mobile */}
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
                     <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: color, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: '#fff' }}>
                       {name.charAt(0).toUpperCase()}
                     </div>
                     <input value={commentInput[post.id] || ''} onChange={e => setCommentInput(prev => ({ ...prev, [post.id]: e.target.value }))} onKeyDown={e => e.key === 'Enter' && submitComment(post.id)} placeholder="Add a comment…" style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text1)', fontSize: '13px', fontFamily: 'inherit' }} />
-                    {commentInput[post.id]?.trim() && (
-                      <button onClick={() => submitComment(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: 'var(--accent)', padding: '0' }}>Post</button>
-                    )}
+                    {/* Always show Post button — not conditional on text */}
+                    <button onClick={() => submitComment(post.id)} disabled={!commentInput[post.id]?.trim()} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: commentInput[post.id]?.trim() ? 'var(--accent)' : 'var(--text3)', padding: '0', flexShrink: 0, fontFamily: 'inherit' }}>Post</button>
                   </div>
                 </div>
               )}
@@ -674,8 +730,11 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
         {!hasMore && posts.length > 0 && <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text3)', fontSize: '12px' }}>You&apos;re all caught up ✨</div>}
       </div>
 
-      {/* Floating create button */}
-      <button onClick={() => setCreating(true)} style={{ position: 'fixed', bottom: '80px', right: '20px', width: '52px', height: '52px', borderRadius: '50%', background: 'var(--ig-gradient)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(225,48,108,.4)', zIndex: 50 }}>
+      {/* Issue 7 & 10: Floating create button — show even with no rooms but handle gracefully */}
+      <button onClick={() => {
+        if (rooms.length === 0) { router.push('/explore'); return }
+        setCreating(true)
+      }} style={{ position: 'fixed', bottom: '80px', right: '20px', width: '52px', height: '52px', borderRadius: '50%', background: 'var(--ig-gradient)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(225,48,108,.4)', zIndex: 50 }}>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
@@ -834,7 +893,7 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
             </>)}
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={() => setCreating(false)} style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '9px', color: 'var(--text2)', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
-              <button onClick={createPost} disabled={!postForm.content.trim() || !postForm.room_id || posting} style={{ flex: 2, padding: '10px', background: 'var(--accent)', border: 'none', borderRadius: '9px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '600', opacity: !postForm.content.trim() || posting ? .6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <button onClick={createPost} disabled={(!postForm.content.trim() && postType !== 'poll') || !postForm.room_id || posting || (postType === 'poll' && (!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2))} style={{ flex: 2, padding: '10px', background: 'var(--accent)', border: 'none', borderRadius: '9px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '600', opacity: ((!postForm.content.trim() && postType !== 'poll') || posting || (postType === 'poll' && (!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2))) ? .6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                 {posting ? <><div className="spinner" />Posting…</> : '✓ Post'}
               </button>
             </div>

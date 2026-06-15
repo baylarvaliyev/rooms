@@ -30,8 +30,8 @@ export default function DebateRoom({ room, currentUser, isMember }: any) {
   const [showCreatePoll, setShowCreatePoll] = useState(false)
   const [pollForm, setPollForm] = useState({ question: '', options: ['', '', ''] })
   const [isOwner, setIsOwner] = useState(false)
-  const [pinnedTakeId, setPinnedTakeId] = useState<string | null>(null)
-  const [closedDebate, setClosedDebate] = useState(false)
+  const [pinnedTakeId, setPinnedTakeId] = useState<string | null>(room.debate_pinned_take || null)
+  const [closedDebate, setClosedDebate] = useState(room.debate_closed || false)
   const supabase = createClient()
   const router = useRouter()
 
@@ -162,17 +162,20 @@ export default function DebateRoom({ room, currentUser, isMember }: any) {
   }
 
   async function pinTake(takeId: string) {
-    setPinnedTakeId(pinnedTakeId === takeId ? null : takeId)
+    const newPin = pinnedTakeId === takeId ? null : takeId
+    setPinnedTakeId(newPin)
+    await supabase.from('rooms').update({ debate_pinned_take: newPin }).eq('id', room.id)
   }
 
   async function markWinner(takeId: string) {
-    // Update take with winner flag
     await supabase.from('room_takes').update({ is_winner: true } as any).eq('id', takeId)
     setTakes(prev => prev.map(t => ({ ...t, is_winner: t.id === takeId })))
   }
 
   async function closeDebate() {
-    setClosedDebate(!closedDebate)
+    const newState = !closedDebate
+    setClosedDebate(newState)
+    await supabase.from('rooms').update({ debate_closed: newState }).eq('id', room.id)
   }
 
   async function deletePoll() {

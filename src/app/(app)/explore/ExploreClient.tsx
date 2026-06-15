@@ -219,7 +219,7 @@ export default function ExploreClient() {
                               : (r.icon_url ? <img src={r.icon_url} style={{ width: '48px', height: '48px', borderRadius: '10px' }} alt="" /> : r.emoji)
                             }
                             {badge && <div style={{ position: 'absolute', bottom: '5px', left: '5px', fontSize: '9px', fontWeight: '700', color: '#fff', background: 'rgba(0,0,0,.6)', padding: '2px 5px', borderRadius: '4px' }}>{badge.label}</div>}
-                            <div style={{ position: 'absolute', top: '6px', right: '6px', padding: '2px 6px', background: 'rgba(0,0,0,.5)', borderRadius: '20px', fontSize: '9px', color: 'rgba(255,255,255,.8)' }}>{r.type}</div>
+                            <div style={{ position: 'absolute', top: '6px', right: '6px', padding: '2px 6px', background: 'rgba(0,0,0,.5)', borderRadius: '20px', fontSize: '9px', color: 'rgba(255,255,255,.8)' }}>{r.type?.charAt(0).toUpperCase() + r.type?.slice(1)}</div>
                           </div>
                           <div style={{ padding: '10px' }}>
                             <div style={{ fontWeight: '600', fontSize: '12px', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
@@ -266,7 +266,7 @@ export default function ExploreClient() {
                       <div style={{ position: 'absolute', top: '8px', left: '8px', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 7px', background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(8px)', borderRadius: '20px', fontSize: '10px', color: '#fff' }}>
                         <span className="live-dot" style={{ width: '5px', height: '5px' }} />live
                       </div>
-                      <div style={{ position: 'absolute', top: '8px', right: '8px', padding: '3px 7px', background: 'rgba(0,0,0,.5)', borderRadius: '20px', fontSize: '10px', color: 'rgba(255,255,255,.8)' }}>{r.type}</div>
+                      <div style={{ position: 'absolute', top: '8px', right: '8px', padding: '3px 7px', background: 'rgba(0,0,0,.5)', borderRadius: '20px', fontSize: '10px', color: 'rgba(255,255,255,.8)' }}>{r.type?.charAt(0).toUpperCase() + r.type?.slice(1)}</div>
                       {badge && <div style={{ position: 'absolute', bottom: '8px', left: '8px', fontSize: '10px', fontWeight: '700', color: '#fff', background: 'rgba(0,0,0,.6)', padding: '2px 6px', borderRadius: '4px' }}>{badge.label}</div>}
                       {r.icon_url && r.cover_url && (
                         <div style={{ position: 'absolute', bottom: '8px', right: '8px', width: '28px', height: '28px', borderRadius: '7px', overflow: 'hidden', border: '2px solid rgba(255,255,255,.3)' }}>
