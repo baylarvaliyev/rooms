@@ -227,8 +227,13 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
     const channel = supabase.channel(`room:${room.id}`, { config: { presence: { key: currentUser.id } } })
       .on('presence', { event: 'sync' }, () => setOnlineCount(Object.keys(channel.presenceState()).length))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${room.id}` }, async (payload) => {
-        const { data } = await supabase.from('messages').select('*, profiles(name, username)').eq('id', payload.new.id).single()
-        if (data) setMessages((prev: any[]) => [...prev, data])
+        const newMsg = payload.new as any
+        // Skip if it's our own message — already shown via optimistic update
+        // But we still need to fetch profile data for others
+        if (newMsg.user_id === currentUser.id) return
+        // Fetch full message with profile for other users' messages
+        const { data } = await supabase.from('messages').select('*, profiles(name, username)').eq('id', newMsg.id).single()
+        if (data) setMessages((prev: any[]) => prev.find((m: any) => m.id === data.id) ? prev : [...prev, data])
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `room_id=eq.${room.id}` }, (payload) => {
         setMessages((prev: any[]) => prev.filter((m: any) => m.id !== payload.old.id))
@@ -310,21 +315,42 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
     const content = input.trim()
     setInput('')
 
-    // Send to room chat
+    // Optimistic update — show YOUR message instantly, don't wait for Realtime
+    const tempId = `temp-${Date.now()}`
+    const optimisticMsg = {
+      id: tempId,
+      room_id: room.id,
+      user_id: currentUser.id,
+      content,
+      created_at: new Date().toISOString(),
+      profiles: { name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || 'You', username: '' }
+    }
+    setMessages((prev: any[]) => [...prev, optimisticMsg])
+
+    // Send to room chat API
     const res = await fetch('/api/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ room_id: room.id, content })
     })
+
     if (!res.ok) {
       const { error } = await res.json()
+      // Remove optimistic message on error
+      setMessages((prev: any[]) => prev.filter((m: any) => m.id !== tempId))
       if (error) alert(error)
       setSending(false)
       return
     }
 
-    // ALSO create a feed post so it appears on followers' feeds
-    await fetch('/api/posts', {
+    // Replace temp message with real one from server
+    const { message } = await res.json()
+    if (message) {
+      setMessages((prev: any[]) => prev.map((m: any) => m.id === tempId ? message : m))
+    }
+
+    // Also create a feed post so it appears on followers' feeds
+    fetch('/api/posts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ room_id: room.id, content, type: 'post' })

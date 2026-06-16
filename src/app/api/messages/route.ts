@@ -19,11 +19,16 @@ export async function POST(req: NextRequest) {
     const { room_id, content } = await req.json()
     if (!content?.trim()) return NextResponse.json({ error: 'Empty message' }, { status: 400 })
 
-    const { data, error } = await supabase.from('messages').insert({
-      room_id,
-      user_id: user.id,
-      content: content.trim(),
-    }).select('*, profiles(name, username)').single()
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({
+        room_id,
+        user_id: user.id,
+        content: content.trim(),
+      })
+      // Return full message with profile so optimistic update can be replaced cleanly
+      .select('*, profiles(name, username)')
+      .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ message: data, remaining: limit.remaining })
