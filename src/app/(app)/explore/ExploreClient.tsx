@@ -263,9 +263,12 @@ export default function ExploreClient() {
                             {r.icon_url ? <img src={r.icon_url} style={{ width: '52px', height: '52px', borderRadius: '12px' }} alt="" /> : r.emoji}
                           </div>
                       }
-                      <div style={{ position: 'absolute', top: '8px', left: '8px', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 7px', background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(8px)', borderRadius: '20px', fontSize: '10px', color: '#fff' }}>
-                        <span className="live-dot" style={{ width: '5px', height: '5px' }} />live
-                      </div>
+                      {/* Issue 35: live badge only on actually active rooms (trending_score > 0) */}
+                      {r.trending_score > 0 && (
+                        <div style={{ position: 'absolute', top: '8px', left: '8px', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 7px', background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(8px)', borderRadius: '20px', fontSize: '10px', color: '#fff' }}>
+                          <span className="live-dot" style={{ width: '5px', height: '5px' }} />active
+                        </div>
+                      )}
                       <div style={{ position: 'absolute', top: '8px', right: '8px', padding: '3px 7px', background: 'rgba(0,0,0,.5)', borderRadius: '20px', fontSize: '10px', color: 'rgba(255,255,255,.8)' }}>{r.type?.charAt(0).toUpperCase() + r.type?.slice(1)}</div>
                       {badge && <div style={{ position: 'absolute', bottom: '8px', left: '8px', fontSize: '10px', fontWeight: '700', color: '#fff', background: 'rgba(0,0,0,.6)', padding: '2px 6px', borderRadius: '4px' }}>{badge.label}</div>}
                       {r.icon_url && r.cover_url && (

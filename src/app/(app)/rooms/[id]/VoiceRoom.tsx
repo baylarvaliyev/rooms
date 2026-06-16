@@ -13,6 +13,7 @@ function getColor(str: string) {
 export default function VoiceRoom({ room, members, currentUser, isMember }: any) {
   const [joined, setJoined] = useState(isMember)
   const [callJoined, setCallJoined] = useState(false)
+  const [wasInCall, setWasInCall] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [participants, setParticipants] = useState<any[]>([])
@@ -131,6 +132,7 @@ export default function VoiceRoom({ room, members, currentUser, isMember }: any)
     setHandRaised(false)
     setDailyUrl('')
     setDailyToken('')
+    setWasInCall(true) // Issue 37: track that user was in call
   }
 
   return (
@@ -223,7 +225,7 @@ export default function VoiceRoom({ room, members, currentUser, isMember }: any)
               <button onClick={joinRoom} style={{ padding: '12px 32px', background: 'var(--accent)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>Join Room</button>
             ) : (
               <button onClick={joinCall} disabled={loading} style={{ padding: '12px 32px', background: 'var(--accent)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '15px', fontWeight: '600', cursor: loading ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '10px', margin: '0 auto', opacity: loading ? .7 : 1 }}>
-                {loading ? <><div className="spinner" />Connecting…</> : '🎙️ Join Voice Room'}
+                {loading ? <><div className="spinner" />Connecting…</> : wasInCall ? '🎙️ Rejoin Voice Room' : '🎙️ Join Voice Room'}
               </button>
             )}
           </div>

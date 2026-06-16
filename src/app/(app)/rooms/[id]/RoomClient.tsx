@@ -24,6 +24,21 @@ const ROOM_COLORS: Record<string, string> = {
   Lifestyle: 'linear-gradient(135deg,#0a0a2a,#1a1a4e)',
 }
 
+// Issue 3: Parse shared post messages from room chat
+function parseRoomMessage(content: string) {
+  if (content?.startsWith('__SHARED_POST__')) {
+    const body = content.slice('__SHARED_POST__'.length)
+    const sepIdx = body.indexOf('|||')
+    const note = sepIdx !== -1 ? body.slice(0, sepIdx) : ''
+    const jsonStr = sepIdx !== -1 ? body.slice(sepIdx + 3) : body
+    try {
+      const post = JSON.parse(jsonStr)
+      return { type: 'shared_post', note, post }
+    } catch {}
+  }
+  return { type: 'text', note: '', post: null }
+}
+
 const REACTION_EMOJIS = ['👍','❤️','😂','🔥','😮','👏','💯','🎉']
 
 function timeAgo(date: string) {
@@ -268,19 +283,17 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
     }
   }
 
+  const [joinRequestSent, setJoinRequestSent] = useState(false)
+
   async function joinRoom() {
     if (isAtMax) { alert('This room is full'); return }
     if (room.join_mode === 'invite_only') { alert('This room is invite only'); return }
     if (room.join_mode === 'request') {
       await supabase.from('room_join_requests').insert({ room_id: room.id, user_id: currentUser.id })
-      alert('Join request sent!')
+      setJoinRequestSent(true)
       return
     }
-    // Show rules modal if rules exist
-    if (room.rules && room.rules.trim()) {
-      setShowRulesModal(true)
-      return
-    }
+    if (room.rules && room.rules.trim()) { setShowRulesModal(true); return }
     await doJoin()
   }
 
@@ -545,8 +558,8 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
                 </button>
               )}
               {!joined && (
-                <button onClick={joinRoom} disabled={!!isAtMax} style={{ padding: '5px 12px', background: isAtMax ? 'var(--bg3)' : 'var(--accent)', border: 'none', borderRadius: '8px', color: isAtMax ? 'var(--text3)' : '#fff', fontSize: '12px', fontWeight: '600', cursor: isAtMax ? 'default' : 'pointer', fontFamily: 'inherit' }}>
-                  {isAtMax ? 'Full' : room.join_mode === 'request' ? 'Request' : 'Join'}
+                <button onClick={joinRoom} disabled={!!isAtMax || joinRequestSent} style={{ padding: '5px 12px', background: joinRequestSent ? 'rgba(99,102,241,.15)' : isAtMax ? 'var(--bg3)' : 'var(--accent)', border: joinRequestSent ? '1px solid rgba(99,102,241,.3)' : 'none', borderRadius: '8px', color: joinRequestSent ? 'var(--accent2)' : isAtMax ? 'var(--text3)' : '#fff', fontSize: '12px', fontWeight: '600', cursor: isAtMax || joinRequestSent ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+                  {isAtMax ? 'Full' : joinRequestSent ? '⏳ Pending…' : room.join_mode === 'request' ? 'Request' : 'Join'}
                 </button>
               )}
             </div>
@@ -600,6 +613,8 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
             const isModMsg = memberInfo?.is_moderator
             const reactionGroups = getReactionGroups(msg.id)
             const hasReactions = Object.keys(reactionGroups).length > 0
+            // Issue 3: parse shared post messages
+            const parsed = parseRoomMessage(msg.content)
 
             return (
               <div key={msg.id} style={{ display: 'flex', gap: '8px', flexDirection: isMe ? 'row-reverse' : 'row' }}>
@@ -618,17 +633,36 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
                     </div>
                   )}
                   <div style={{ position: 'relative' }}>
-                    <div
-                      onContextMenu={e => {
-                        if (isMod || isMe) { e.preventDefault(); setContextMenu({ msgId: msg.id, x: e.clientX, y: e.clientY, content: msg.content }) }
-                      }}
-                      onDoubleClick={() => joined && setShowReactionPicker(msg.id)}
-                      style={{ padding: '8px 12px', borderRadius: isMe ? '13px 13px 4px 13px' : '13px 13px 13px 4px', background: isMe ? 'var(--accent)' : 'var(--bg3)', color: isMe ? '#fff' : 'var(--text2)', border: isMe ? 'none' : '1px solid var(--border)', fontSize: '13px', lineHeight: '1.6', wordBreak: 'break-word', cursor: 'default' }}>
-                      {msg.content}
-                    </div>
+                    {/* Issue 3: Render shared post as card, not raw JSON */}
+                    {parsed.type === 'shared_post' && parsed.post ? (
+                      <div>
+                        {parsed.note && <div style={{ padding: '6px 12px', marginBottom: '4px', fontSize: '13px', color: isMe ? '#fff' : 'var(--text1)', background: isMe ? 'var(--accent)' : 'var(--bg3)', borderRadius: isMe ? '13px 13px 4px 13px' : '13px 13px 13px 4px', border: isMe ? 'none' : '1px solid var(--border)' }}>{parsed.note}</div>}
+                        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '12px', overflow: 'hidden', maxWidth: '240px' }}>
+                          <div style={{ padding: '9px 11px', borderBottom: '1px solid var(--border)' }}>
+                            <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '3px' }}>📎 {parsed.post.room_emoji} {parsed.post.room}</div>
+                            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text2)', marginBottom: '4px' }}>{parsed.post.author}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text1)', lineHeight: '1.5', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{parsed.post.content}</div>
+                          </div>
+                          {parsed.post.media_url && <img src={parsed.post.media_url} alt="" style={{ width: '100%', maxHeight: '140px', objectFit: 'cover', display: 'block' }} />}
+                          <div style={{ padding: '6px 11px', display: 'flex', gap: '10px' }}>
+                            <span style={{ fontSize: '10px', color: 'var(--text3)' }}>❤️ {parsed.post.like_count}</span>
+                            <span style={{ fontSize: '10px', color: 'var(--text3)' }}>💬 {parsed.post.comment_count}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        onContextMenu={e => {
+                          if (isMod || isMe) { e.preventDefault(); setContextMenu({ msgId: msg.id, x: e.clientX, y: e.clientY, content: msg.content }) }
+                        }}
+                        onDoubleClick={() => joined && setShowReactionPicker(msg.id)}
+                        style={{ padding: '8px 12px', borderRadius: isMe ? '13px 13px 4px 13px' : '13px 13px 13px 4px', background: isMe ? 'var(--accent)' : 'var(--bg3)', color: isMe ? '#fff' : 'var(--text2)', border: isMe ? 'none' : '1px solid var(--border)', fontSize: '13px', lineHeight: '1.6', wordBreak: 'break-word', cursor: 'default' }}>
+                        {msg.content}
+                      </div>
+                    )}
 
                     {/* Reaction picker button */}
-                    {joined && (
+                    {joined && parsed.type !== 'shared_post' && (
                       <button onClick={e => { e.stopPropagation(); setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id) }}
                         style={{ position: 'absolute', top: '-8px', [isMe ? 'left' : 'right']: '-8px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '11px', opacity: 0.7 }}>
                         😊

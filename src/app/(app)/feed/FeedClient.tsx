@@ -51,9 +51,11 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
   const [reportReason, setReportReason] = useState('')
   // Issue 1: Post actions menu — separate delete/edit/report
   const [postMenu, setPostMenu] = useState<string | null>(null)
-  // Issue 29: Edit post
   const [editingPost, setEditingPost] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set())
+  // Issue 2: store personalization context for loadMore
+  const [feedContext, setFeedContext] = useState<{ followingIds: string[], roomIds: string[] }>({ followingIds: [], roomIds: [] })
   const [sharing, setSharing] = useState<any>(null)
   const [shareTarget, setShareTarget] = useState<'dm' | 'room'>('dm')
   const [shareSearch, setShareSearch] = useState('')
@@ -85,6 +87,7 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
       { data: likes },
       { data: savedData },
       { data: roomsForPost },
+      { data: blockedData },
     ] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).single(),
       supabase.from('room_members').select('room_id').eq('user_id', user.id),
@@ -93,12 +96,17 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
       supabase.from('likes').select('post_id').eq('user_id', user.id),
       supabase.from('saved_posts').select('post_id').eq('user_id', user.id),
       supabase.from('room_members').select('rooms(id, name, emoji, icon_url, cover_url)').eq('user_id', user.id),
+      // Issue 31: load blocked users
+      supabase.from('user_blocks').select('blocked_id').eq('blocker_id', user.id),
     ])
 
     setProfile(profileData)
     setLiked(new Set((likes || []).map((l: any) => l.post_id)))
     setSaved(new Set((savedData || []).map((s: any) => s.post_id)))
     setRooms((roomsForPost || []).map((r: any) => r.rooms).filter(Boolean))
+    // Issue 31: store blocked IDs to filter feed
+    const blocked = new Set<string>((blockedData || []).map((b: any) => b.blocked_id))
+    setBlockedIds(blocked)
 
     const joinedRoomIds = (joinedRooms || []).map((r: any) => r.room_id)
     const followedRoomIds = (followedRoomRows || []).map((r: any) => r.room_id)
@@ -180,12 +188,13 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
       if (tp_post && !seen.has(tp_post.id)) { seen.add(tp_post.id); merged.push({ ...tp_post, _source: 'trending' }) }
     }
 
-    // Also load online counts for rooms in feed
-    const roomIdsInFeed = [...new Set(merged.map((p: any) => p.room_id).filter(Boolean))]
-
-    setPosts(merged.slice(0, 30))
+    // Issue 2: Save personalization context for loadMore
+    setFeedContext({ followingIds, roomIds: allRoomIds })
+    // Issue 31: filter blocked users from merged feed
+    const filtered = merged.filter((p: any) => !blocked.has(p.user_id))
+    setPosts(filtered.slice(0, 30))
     setSuggestedRooms(suggested || [])
-    setHasMore(merged.length === 30)
+    setHasMore(filtered.length >= 30)
     setDataLoading(false)
   }
 
@@ -204,15 +213,33 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
     setLoadingMore(true)
     const nextPage = page + 1
     const from = nextPage * 30
-    const { data } = await supabase
-      .from('posts')
-      .select('*, profiles(name, username, avatar_url), rooms(name, emoji, category)')
-      .order('created_at', { ascending: false })
-      .range(from, from + 29)
-    if (data && data.length > 0) {
+    const postSelect = '*, profiles(name, username, avatar_url), rooms(id, name, emoji, category)'
+
+    // Issue 2: use personalized context instead of fetching all posts
+    const { followingIds, roomIds } = feedContext
+    let data: any[] = []
+
+    if (followingIds.length > 0 || roomIds.length > 0) {
+      const queries: Promise<any>[] = []
+      if (followingIds.length > 0) {
+        queries.push(supabase.from('posts').select(postSelect).in('user_id', followingIds).order('created_at', { ascending: false }).range(from, from + 14).then(r => r.data || []) as Promise<any>)
+      }
+      if (roomIds.length > 0) {
+        queries.push(supabase.from('posts').select(postSelect).in('room_id', roomIds).order('created_at', { ascending: false }).range(from, from + 14).then(r => r.data || []) as Promise<any>)
+      }
+      const results = await Promise.all(queries)
+      const seen = new Set<string>(posts.map((p: any) => p.id))
+      results.flat().forEach((p: any) => { if (!seen.has(p.id) && !blockedIds.has(p.user_id)) { seen.add(p.id); data.push(p) } })
+    } else {
+      // fallback for new users
+      const { data: d } = await supabase.from('posts').select(postSelect).order('created_at', { ascending: false }).range(from, from + 29)
+      data = (d || []).filter((p: any) => !blockedIds.has(p.user_id))
+    }
+
+    if (data.length > 0) {
       setPosts((prev: any[]) => [...prev, ...data])
       setPage(nextPage)
-      if (data.length < 30) setHasMore(false)
+      if (data.length < 15) setHasMore(false)
     } else {
       setHasMore(false)
     }
@@ -260,11 +287,25 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
   }
 
   async function toggleComments(postId: string) {
+    const wasOpen = openComments.has(postId)
     setOpenComments(prev => { const n = new Set(prev); n.has(postId) ? n.delete(postId) : n.add(postId); return n })
-    if (!comments[postId]) {
-      const { data } = await supabase.from('comments').select('*, profiles(name)').eq('post_id', postId).order('created_at', { ascending: true })
+    if (!wasOpen && !comments[postId]) {
+      const { data } = await supabase.from('comments').select('*, profiles(name, avatar_url)').eq('post_id', postId).order('created_at', { ascending: true })
       setComments(prev => ({ ...prev, [postId]: data || [] }))
+      // Issue 18: scroll to comments after loading
+      setTimeout(() => {
+        const el = document.getElementById(`comments-${postId}`)
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
     }
+  }
+
+  // Issue 25: Delete own comment
+  async function deleteComment(commentId: string, postId: string) {
+    if (!confirm('Delete this comment?')) return
+    await supabase.from('comments').delete().eq('id', commentId).eq('user_id', currentUserId)
+    setComments(prev => ({ ...prev, [postId]: (prev[postId] || []).filter(c => c.id !== commentId) }))
+    setPosts((prev: any[]) => prev.map(p => p.id === postId ? { ...p, comment_count: Math.max(0, p.comment_count - 1) } : p))
   }
 
   async function deletePost(postId: string) {
@@ -443,6 +484,10 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
   const [refreshing, setRefreshing] = useState(false)
   const touchStartY = useRef(0)
 
+  // Issue 9: reset postMenu on route change
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
+  useEffect(() => { setPostMenu(null) }, [pathname])
+
   async function handleRefresh() {
     if (refreshing) return
     setRefreshing(true)
@@ -514,10 +559,11 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
                       onMouseOver={e => (e.currentTarget as HTMLElement).style.boxShadow = `0 0 16px ${neon}99, 0 0 32px ${neon}44`}
                       onMouseOut={e => (e.currentTarget as HTMLElement).style.boxShadow = `0 0 10px ${neon}55, 0 0 20px ${neon}22`}
                     >
-                      {r.icon_url
-                        ? <img src={r.icon_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                        : r.emoji
-                      }
+                    {/* Issue 24: onError fallback to emoji if icon URL is broken */}
+                    {r.icon_url
+                      ? <img src={r.icon_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" onError={e => { (e.target as HTMLElement).style.display = 'none'; (e.target as HTMLElement).parentElement!.textContent = r.emoji }} />
+                      : r.emoji
+                    }
                     </div>
                     <span style={{ fontSize: '10px', color: 'var(--text2)', maxWidth: '66px', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
                   </div>
@@ -583,7 +629,10 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{timeAgo(post.created_at)}</div>
                 </div>
-                {/* Issue 1 & 37: Proper SVG ··· menu button, not unicode dots */}
+              {/* Issue 1: click-trap backdrop to close menu */}
+              {postMenu === post.id && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 199 }} onClick={() => setPostMenu(null)} />
+              )}
                 <div style={{ position: 'relative' }}>
                   <button onClick={e => { e.stopPropagation(); setPostMenu(postMenu === post.id ? null : post.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: '6px', display: 'flex', alignItems: 'center', borderRadius: '6px' }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -635,8 +684,8 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
                 </div>
               )}
 
-              {/* Issue 4: Room context card on ALL posts that have a room (not just _source=room) */}
-              {post.rooms && (
+              {/* Issue 4 & 10: Room card only on posts from OTHER people's rooms (not your own post) */}
+              {post.rooms && post.user_id !== currentUserId && (
                 <div onClick={() => router.push(`/rooms/${post.room_id}`)} style={{ margin: '0 14px 8px', padding: '10px 12px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', transition: 'background .18s' }}
                   onMouseOver={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg3)'}
                   onMouseOut={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg2)'}
@@ -698,14 +747,22 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
               {showComments && (
                 <div style={{ padding: '0 14px 8px' }} id={`comments-${post.id}`}>
                   {(comments[post.id] || []).map((c: any) => (
-                    <div key={c.id} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: getColor(c.profiles?.name || 'U'), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: '#fff' }}>
-                        {(c.profiles?.name || 'U').charAt(0).toUpperCase()}
+                    <div key={c.id} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'flex-start' }}>
+                      {/* Issue 32: show real avatar photo */}
+                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: c.profiles?.avatar_url ? 'none' : getColor(c.profiles?.name || 'U'), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: '#fff', overflow: 'hidden' }}>
+                        {c.profiles?.avatar_url
+                          ? <img src={c.profiles.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                          : (c.profiles?.name || 'U').charAt(0).toUpperCase()
+                        }
                       </div>
-                      <div style={{ fontSize: '13px', color: 'var(--text1)', lineHeight: '1.5' }}>
+                      <div style={{ flex: 1, fontSize: '13px', color: 'var(--text1)', lineHeight: '1.5' }}>
                         <span style={{ fontWeight: '600', marginRight: '6px' }}>{c.profiles?.name}</span>
                         {c.content}
                       </div>
+                      {/* Issue 25: delete own comment */}
+                      {c.user_id === currentUserId && (
+                        <button onClick={() => deleteComment(c.id, post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '14px', padding: '0 2px', flexShrink: 0, lineHeight: 1 }}>×</button>
+                      )}
                     </div>
                   ))}
 
@@ -730,11 +787,11 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
         {!hasMore && posts.length > 0 && <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text3)', fontSize: '12px' }}>You&apos;re all caught up ✨</div>}
       </div>
 
-      {/* Issue 7 & 10: Floating create button — show even with no rooms but handle gracefully */}
+      {/* Issue 22: floating button uses paddingBottom safe area */}
       <button onClick={() => {
         if (rooms.length === 0) { router.push('/explore'); return }
         setCreating(true)
-      }} style={{ position: 'fixed', bottom: '80px', right: '20px', width: '52px', height: '52px', borderRadius: '50%', background: 'var(--ig-gradient)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(225,48,108,.4)', zIndex: 50 }}>
+      }} style={{ position: 'fixed', bottom: 'calc(80px + env(safe-area-inset-bottom, 0px))', right: '20px', width: '52px', height: '52px', borderRadius: '50%', background: 'var(--ig-gradient)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(225,48,108,.4)', zIndex: 50 }}>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
@@ -758,9 +815,9 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
               <>
                 <div style={{ padding: '8px 16px 12px', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ fontWeight: '700', fontSize: '15px', marginBottom: '10px' }}>Share Post</div>
-                  {/* Post preview */}
+                  {/* Issue 14: show image preview or text for image-only posts */}
                   <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px', fontSize: '13px', color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {sharing.content?.slice(0, 100)}
+                    {sharing.content ? sharing.content.slice(0, 100) : sharing.media_url ? '📷 Photo post' : '(No text)'}
                   </div>
                   {/* Message */}
                   <input value={shareMsg} onChange={e => setShareMsg(e.target.value)} placeholder="Add a message… (optional)" style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text1)', fontSize: '13px', outline: 'none', fontFamily: 'inherit', marginBottom: '10px' }} />

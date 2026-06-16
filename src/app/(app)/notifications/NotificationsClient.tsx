@@ -48,10 +48,13 @@ export default function NotificationsClient() {
       .limit(50)
 
     setNotifications(data || [])
-
-    // Mark all as read
-    await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
     setLoading(false)
+
+    // Issue 29: delay marking as read by 2s so user actually sees unread state first
+    setTimeout(async () => {
+      await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    }, 2000)
   }
 
   if (loading) {

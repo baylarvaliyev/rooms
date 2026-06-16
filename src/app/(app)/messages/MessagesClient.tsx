@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
 const COLORS = ['#6366f1','#0891b2','#ec4899','#16a34a','#0f766e','#7c3aed','#d97706','#f97316']
@@ -56,7 +56,10 @@ export default function MessagesClient() {
   const typingTimeoutRef = useRef<any>(null)
   const [viewingPost, setViewingPost] = useState<any>(null)
   const searchParams = useSearchParams()
+  const router = useRouter()
   const supabase = createClient()
+  // Issue 6: store typing channel ref for cleanup
+  const typingChannelRef = useRef<any>(null)
 
   useEffect(() => {
     initUser()
@@ -175,23 +178,28 @@ export default function MessagesClient() {
   }
 
   async function openConversation(user: any) {
+    // Issue 6: cleanup previous typing channel
+    if (typingChannelRef.current) {
+      supabase.removeChannel(typingChannelRef.current)
+      typingChannelRef.current = null
+    }
     setActiveUser(user)
     setView('chat')
     setShowSearch(false)
     setSearch('')
+    setTypingUsers(new Set())
     const { data } = await supabase
       .from('direct_messages')
       .select('*')
       .or(`and(from_user.eq.${currentUserId},to_user.eq.${user.id}),and(from_user.eq.${user.id},to_user.eq.${currentUserId})`)
       .order('created_at', { ascending: true })
     setMessages(data || [])
-    // Mark messages as read
     await supabase.from('direct_messages')
       .update({ read_at: new Date().toISOString() })
       .eq('to_user', currentUserId)
       .eq('from_user', user.id)
       .is('read_at', null)
-    // Subscribe to typing indicators for this conversation
+    // Issue 6: subscribe and store channel ref
     const typingChannel = supabase.channel(`typing:${[currentUserId, user.id].sort().join('-')}`)
       .on('broadcast', { event: 'typing' }, ({ payload }) => {
         if (payload.user_id !== currentUserId) {
@@ -200,7 +208,7 @@ export default function MessagesClient() {
         }
       })
       .subscribe()
-    return () => supabase.removeChannel(typingChannel)
+    typingChannelRef.current = typingChannel
   }
 
   function handleTyping() {
@@ -476,12 +484,12 @@ export default function MessagesClient() {
                 <span style={{ fontSize: '13px', color: 'var(--text3)' }}>💬 {viewingPost.comment_count} comments</span>
               </div>
             </div>
-            {/* Go to room button */}
+            {/* Issue 5: use router.push not <a href> to avoid full reload */}
             {viewingPost.room_id && (
               <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
-                <a href={`/rooms/${viewingPost.room_id}`} style={{ display: 'block', width: '100%', padding: '12px', background: 'var(--ig-gradient)', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '14px', fontWeight: '600', cursor: 'pointer', textAlign: 'center', textDecoration: 'none' }}>
+                <button onClick={() => { setViewingPost(null); router.push(`/rooms/${viewingPost.room_id}`) }} style={{ display: 'block', width: '100%', padding: '12px', background: 'var(--ig-gradient)', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '14px', fontWeight: '600', cursor: 'pointer', textAlign: 'center', fontFamily: 'inherit' }}>
                   View in {viewingPost.room_emoji} {viewingPost.room} →
-                </a>
+                </button>
               </div>
             )}
           </div>

@@ -243,7 +243,10 @@ export default function ProfileClient({ profile: initialProfile, posts: initialP
     setLeaderboard(topUsers || [])
     if (user && profile) {
       const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).gt('reputation', profile.reputation || 0)
-      setMyRank((count || 0) + 1)
+      // Issue 36: only show meaningful rank — don't show #1 with 0 pts if no real competition
+      if ((profile.reputation || 0) > 0 || (count || 0) > 0) {
+        setMyRank((count || 0) + 1)
+      }
     }
     setLeaderboardLoading(false)
   }
