@@ -307,13 +307,29 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
   async function sendMessage() {
     if (!input.trim() || !joined || sending) return
     setSending(true)
+    const content = input.trim()
+    setInput('')
+
+    // Send to room chat
     const res = await fetch('/api/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ room_id: room.id, content: input.trim() })
+      body: JSON.stringify({ room_id: room.id, content })
     })
-    if (!res.ok) { const { error } = await res.json(); if (error) alert(error) }
-    else setInput('')
+    if (!res.ok) {
+      const { error } = await res.json()
+      if (error) alert(error)
+      setSending(false)
+      return
+    }
+
+    // ALSO create a feed post so it appears on followers' feeds
+    await fetch('/api/posts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room_id: room.id, content, type: 'post' })
+    })
+
     setSending(false)
   }
 

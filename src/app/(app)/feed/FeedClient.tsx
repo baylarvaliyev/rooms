@@ -348,7 +348,6 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
   }
 
   async function createPost() {
-    // Issue 2: Poll content is optional — only question and options are required
     if (postType !== 'poll' && !postForm.content.trim()) return
     if (!postForm.room_id) return
     setPosting(true)
@@ -361,6 +360,11 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
       }).select('*, profiles(name, username, avatar_url), rooms(name, emoji, category)').single()
       if (post) {
         await supabase.from('polls').insert({ post_id: post.id, question: pollQuestion, options: validOptions.map(o => ({ text: o, votes: 0 })) })
+        // Also send a card into the room chat so room members see it
+        await supabase.from('messages').insert({
+          room_id: postForm.room_id, user_id: currentUserId,
+          content: `__SHARED_POST__${JSON.stringify({ id: post.id, content: `📊 Poll: ${pollQuestion}`, author: profile?.name, room: post.rooms?.name, room_emoji: post.rooms?.emoji, room_id: postForm.room_id, like_count: 0, comment_count: 0, media_url: null })}`
+        })
         setPosts((prev: any[]) => [post, ...prev])
       }
       setPostForm({ content: '', room_id: rooms[0]?.id || '', type: 'post' })
@@ -378,11 +382,18 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
         mediaUrl = urlData.publicUrl
       }
     }
+
     const { data } = await supabase.from('posts').insert({
       content: postForm.content, room_id: postForm.room_id, user_id: currentUserId,
       type: imageFile ? 'photo' : 'post', media_url: mediaUrl,
-    }).select('*, profiles(name, username, avatar_url), rooms(name, emoji, category)').single()
+    }).select('*, profiles(name, username, avatar_url), rooms(id, name, emoji, category)').single()
+
     if (data) {
+      // Also push a post card into the room chat so room members see it instantly
+      await supabase.from('messages').insert({
+        room_id: postForm.room_id, user_id: currentUserId,
+        content: `__SHARED_POST__${JSON.stringify({ id: data.id, content: postForm.content, author: profile?.name, room: data.rooms?.name, room_emoji: data.rooms?.emoji, room_id: postForm.room_id, like_count: 0, comment_count: 0, media_url: mediaUrl || null })}`
+      })
       setPosts((prev: any[]) => [data, ...prev])
       setPostForm({ content: '', room_id: rooms[0]?.id || '', type: 'post' })
       setImageFile(null); setImagePreview(null); setCreating(false)
