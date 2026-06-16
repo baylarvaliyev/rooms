@@ -336,7 +336,6 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
 
     if (!res.ok) {
       const { error } = await res.json()
-      // Remove optimistic message on error
       setMessages((prev: any[]) => prev.filter((m: any) => m.id !== tempId))
       if (error) alert(error)
       setSending(false)
@@ -349,27 +348,56 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
       setMessages((prev: any[]) => prev.map((m: any) => m.id === tempId ? message : m))
     }
 
-    // Also create a feed post so it appears on followers' feeds
-    fetch('/api/posts', {
+    setSending(false)
+  }
+
+  const [sharingToFeed, setSharingToFeed] = useState<any>(null)
+  const [feedShareSent, setFeedShareSent] = useState(false)
+
+  async function shareMessageToFeed(msg: any) {
+    setSharingToFeed(msg)
+  }
+
+  async function confirmShareToFeed() {
+    if (!sharingToFeed) return
+    setFeedShareSent(true)
+    // Create a real feed post attributed to current user, quoting the room message
+    await fetch('/api/posts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ room_id: room.id, content, type: 'post' })
+      body: JSON.stringify({
+        content: sharingToFeed.content,
+        room_id: room.id,
+        type: 'post',
+      })
     })
-
-    setSending(false)
+    setTimeout(() => { setSharingToFeed(null); setFeedShareSent(false) }, 1500)
   }
 
   async function deleteMessage(msgId: string) {
     await supabase.from('messages').delete().eq('id', msgId)
+    setMessages((prev: any[]) => prev.filter((m: any) => m.id !== msgId))
     setContextMenu(null)
   }
 
   async function toggleReaction(messageId: string, emoji: string) {
-    const existing = (reactions[messageId] || []).find(r => r.user_id === currentUser.id && r.emoji === emoji)
+    const existing = (reactions[messageId] || []).find((r: any) => r.user_id === currentUser.id && r.emoji === emoji)
     if (existing) {
       await supabase.from('message_reactions').delete().eq('id', existing.id)
+      // Update local state immediately
+      setReactions(prev => ({
+        ...prev,
+        [messageId]: (prev[messageId] || []).filter((r: any) => r.id !== existing.id)
+      }))
     } else {
-      await supabase.from('message_reactions').insert({ message_id: messageId, user_id: currentUser.id, emoji })
+      const { data } = await supabase.from('message_reactions').insert({ message_id: messageId, user_id: currentUser.id, emoji }).select().single()
+      // Update local state immediately
+      if (data) {
+        setReactions(prev => ({
+          ...prev,
+          [messageId]: [...(prev[messageId] || []), data]
+        }))
+      }
     }
     setShowReactionPicker(null)
   }
@@ -703,13 +731,27 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
                       </div>
                     )}
 
-                    {/* Reaction picker button */}
+                    {/* Reaction picker button + Share to Feed + Delete — always visible on mobile */}
                     {joined && parsed.type !== 'shared_post' && (
-                      <button onClick={e => { e.stopPropagation(); setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id) }}
-                        style={{ position: 'absolute', top: '-8px', [isMe ? 'left' : 'right']: '-8px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '11px', opacity: 0.7 }}>
-                        😊
-                      </button>
+                      <div style={{ display: 'flex', gap: '4px', marginTop: '4px', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                        {/* Share to Feed button */}
+                        <button onClick={() => shareMessageToFeed(msg)}
+                          style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '12px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px', color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          ↗ Feed
+                        </button>
+                        {/* Delete — visible to owner or mod */}
+                        {(isMe || isMod) && (
+                          <button onClick={() => deleteMessage(msg.id)}
+                            style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '12px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px', color: 'var(--red)' }}>
+                            🗑
+                          </button>
+                        )}
+                      </div>
                     )}
+                      <button onClick={e => { e.stopPropagation(); setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id) }}
+                          style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '12px', padding: '2px 7px', cursor: 'pointer', fontSize: '12px', color: 'var(--text3)' }}>
+                          😊
+                        </button>
 
                     {/* Reaction picker popup */}
                     {showReactionPicker === msg.id && (
@@ -1011,6 +1053,37 @@ export default function RoomClient({ room: initialRoom, initialMessages, members
                 <FounderDashboard room={room} members={members} onlineCount={onlineCount} schedules={schedules} supabase={supabase} />
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share to Feed confirmation modal */}
+      {sharingToFeed && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+          onClick={e => e.target === e.currentTarget && setSharingToFeed(null)}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '400px' }} className="fade-up">
+            {feedShareSent ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
+                <div style={{ fontWeight: '700', fontSize: '16px' }}>Shared to your feed!</div>
+                <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '6px' }}>Your followers can now see this post</div>
+              </div>
+            ) : (
+              <>
+                <div style={{ fontWeight: '700', fontSize: '16px', marginBottom: '6px' }}>↗️ Share to Feed</div>
+                <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '14px' }}>This message will appear as a post on your feed, visible to your followers.</div>
+                <div style={{ background: 'var(--bg3)', borderRadius: '10px', padding: '12px', marginBottom: '16px', fontSize: '13px', color: 'var(--text2)', lineHeight: '1.6', borderLeft: '3px solid var(--accent)' }}>
+                  {sharingToFeed.content}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '14px' }}>
+                  From {room.emoji} {room.name} · will appear on your feed
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => setSharingToFeed(null)} style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '9px', color: 'var(--text2)', cursor: 'pointer', fontSize: '13px', fontFamily: 'inherit' }}>Cancel</button>
+                  <button onClick={confirmShareToFeed} style={{ flex: 2, padding: '10px', background: 'var(--ig-gradient)', border: 'none', borderRadius: '9px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: 'inherit' }}>Share to Feed</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
