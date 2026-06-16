@@ -481,6 +481,33 @@ export default function FeedClient({ posts: initialPosts, likedIds: initialLiked
     setPosts((prev: any[]) => prev.map(p => p.id === postId ? { ...p, _poll: { ...poll, options: optionsWithVotes } } : p))
   }
 
+  // Real-time: new posts in your rooms appear instantly without refresh
+  useEffect(() => {
+    if (!currentUserId || feedContext.roomIds.length === 0) return
+    const channel = supabase.channel(`feed:posts:${currentUserId}`)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'posts',
+      }, async (payload) => {
+        const newPost = payload.new as any
+        // Only show if it's from a room you're in, or from someone you follow
+        const isFromMyRoom = feedContext.roomIds.includes(newPost.room_id)
+        const isFromFollowed = feedContext.followingIds.includes(newPost.user_id)
+        const isMyOwn = newPost.user_id === currentUserId
+        if (!isFromMyRoom && !isFromFollowed && !isMyOwn) return
+        // Fetch full post with joins
+        const { data } = await supabase
+          .from('posts')
+          .select('*, profiles(name, username, avatar_url), rooms(id, name, emoji, category, member_count)')
+          .eq('id', newPost.id)
+          .single()
+        if (data && !blockedIds.has(data.user_id)) {
+          setPosts((prev: any[]) => prev.find((p: any) => p.id === data.id) ? prev : [data, ...prev])
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [currentUserId, feedContext.roomIds, feedContext.followingIds])
+
   const [refreshing, setRefreshing] = useState(false)
   const touchStartY = useRef(0)
 
